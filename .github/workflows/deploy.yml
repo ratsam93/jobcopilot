@@ -10,7 +10,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to Contabo
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy repository to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.PORT }}
+          source: "."
+          target: "/opt/projects/jobcopilot"
+          strip_components: 0
+          overwrite: true
+          rm: true
+
+      - name: Restart stack on VPS
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.HOST }}
@@ -18,13 +34,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.PORT }}
           script: |
+            set -e
             cd /opt/projects/jobcopilot
-
-            if [ ! -d ".git" ]; then
-              git clone https://github.com/ratsam93/jobcopilot.git .
-            fi
-
-            git pull origin main
-
             docker compose down || true
             docker compose up -d --build

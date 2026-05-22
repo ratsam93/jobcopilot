@@ -10,7 +10,7 @@ client = TestClient(app)
 
 def test_campaign_create_parses_structured_query() -> None:
     response = client.post(
-        "/campaigns/create",
+        "/api/campaigns/create",
         json={
             "natural_language_prompt": "Apply to top technology companies across the USA where I fit.",
             "campaign_name": None,
@@ -23,4 +23,3 @@ def test_campaign_create_parses_structured_query() -> None:
     assert body["status"] == "created"
     assert body["structured_query"]["target_countries"] == ["United States"]
     assert body["execution_mode"] == "approval_required"
-

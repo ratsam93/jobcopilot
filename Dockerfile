@@ -7,20 +7,11 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM python:3.12-slim AS runtime
+FROM nginx:1.27-alpine AS frontend-runtime
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PORT=8000
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=frontend-builder /src/frontend/dist /usr/share/nginx/html
 
-WORKDIR /app
+EXPOSE 3000
 
-RUN pip install --no-cache-dir fastapi uvicorn
-
-COPY pyproject.toml ./
-COPY apps ./apps
-COPY --from=frontend-builder /src/frontend/dist ./frontend/dist
-
-EXPOSE 8000
-
-CMD ["sh", "-c", "uvicorn apps.backend.app.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["nginx", "-g", "daemon off;"]
