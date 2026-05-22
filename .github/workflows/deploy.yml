@@ -1,0 +1,54 @@
+name: Deploy to Contabo VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-jobcopilot-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${SSH_KEY}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${PORT}" -H "${HOST}" >> ~/.ssh/known_hosts
+        env:
+          HOST: ${{ secrets.HOST }}
+          PORT: ${{ secrets.PORT }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+
+      - name: Sync files to server
+        run: |
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude '.github/workflows/deploy.yml' \
+            -e "ssh -i ~/.ssh/id_ed25519 -p ${PORT}" \
+            ./ "${USERNAME}@${HOST}:/opt/projects/jobcopilot/"
+        env:
+          HOST: ${{ secrets.HOST }}
+          PORT: ${{ secrets.PORT }}
+          USERNAME: ${{ secrets.USERNAME }}
+
+      - name: Rebuild and restart stack
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -p "${PORT}" "${USERNAME}@${HOST}" <<'EOF'
+          set -euo pipefail
+          cd /opt/projects/jobcopilot
+          docker compose up -d --build --remove-orphans
+          EOF
+        env:
+          HOST: ${{ secrets.HOST }}
+          PORT: ${{ secrets.PORT }}
+          USERNAME: ${{ secrets.USERNAME }}

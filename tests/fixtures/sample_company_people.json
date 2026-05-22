@@ -1,0 +1,1 @@
+[{"person_id":"person-1","company":"Acme AI","name":"Jane Doe","title":"Hiring Manager","person_type":"likely_hiring_manager","source_url":"https://example.com/team","source_type":"company_page","email":"jane.doe@example.com","email_verification_status":"verified","confidence":0.9,"why_relevant":"Owns the team."}]

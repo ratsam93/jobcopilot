@@ -1,0 +1,9 @@
+Sam Patel
+AI Consultant
+
+AI automation, FastAPI, SQL, Postgres, Docker, AWS, LLMs
+
+- Built AI automation workflows for consulting clients.
+- Led backend APIs using FastAPI and SQL.
+- Worked remotely from India.
+
