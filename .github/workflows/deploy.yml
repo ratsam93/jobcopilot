@@ -53,6 +53,9 @@ jobs:
       - name: Validate SSH secret shape
         env:
           SSH_KEY: ${{ secrets.SSH_KEY }}
+          JOBCOPILOT_ADMIN_EMAIL: ${{ secrets.JOBCOPILOT_ADMIN_EMAIL }}
+          JOBCOPILOT_ADMIN_PASSWORD: ${{ secrets.JOBCOPILOT_ADMIN_PASSWORD }}
+          JOBCOPILOT_SECRET_KEY: ${{ secrets.JOBCOPILOT_SECRET_KEY }}
         run: |
           set -euo pipefail
           if [ -z "${SSH_KEY}" ]; then
@@ -72,6 +75,18 @@ jobs:
             echo "SSH_KEY must be multiline private-key text, not a single-line value."
             exit 1
           fi
+          if [ -z "${JOBCOPILOT_ADMIN_EMAIL}" ]; then
+            echo "JOBCOPILOT_ADMIN_EMAIL secret is empty."
+            exit 1
+          fi
+          if [ -z "${JOBCOPILOT_ADMIN_PASSWORD}" ]; then
+            echo "JOBCOPILOT_ADMIN_PASSWORD secret is empty."
+            exit 1
+          fi
+          if [ -z "${JOBCOPILOT_SECRET_KEY}" ]; then
+            echo "JOBCOPILOT_SECRET_KEY secret is empty."
+            exit 1
+          fi
 
       - name: Pull latest code and restart stack on VPS
         uses: appleboy/ssh-action@v1.2.0
@@ -79,12 +94,15 @@ jobs:
           REPO_URL: https://github.com/${{ github.repository }}.git
           BRANCH: main
           DEPLOY_DIR: /opt/projects/jobcopilot
+          JOBCOPILOT_ADMIN_EMAIL: ${{ secrets.JOBCOPILOT_ADMIN_EMAIL }}
+          JOBCOPILOT_ADMIN_PASSWORD: ${{ secrets.JOBCOPILOT_ADMIN_PASSWORD }}
+          JOBCOPILOT_SECRET_KEY: ${{ secrets.JOBCOPILOT_SECRET_KEY }}
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.PORT }}
-          envs: REPO_URL,BRANCH,DEPLOY_DIR
+          envs: REPO_URL,BRANCH,DEPLOY_DIR,JOBCOPILOT_ADMIN_EMAIL,JOBCOPILOT_ADMIN_PASSWORD,JOBCOPILOT_SECRET_KEY
           script: |
             set -euo pipefail
 
@@ -99,6 +117,13 @@ jobs:
             git config --global --add safe.directory "$DEPLOY_DIR" || true
             git fetch origin "$BRANCH"
             git reset --hard "origin/$BRANCH"
+
+            {
+              printf 'JOBCOPILOT_ADMIN_EMAIL=%s\n' "$JOBCOPILOT_ADMIN_EMAIL"
+              printf 'JOBCOPILOT_ADMIN_PASSWORD=%s\n' "$JOBCOPILOT_ADMIN_PASSWORD"
+              printf 'JOBCOPILOT_SECRET_KEY=%s\n' "$JOBCOPILOT_SECRET_KEY"
+            } > .env
+            chmod 600 .env
 
             docker compose down --remove-orphans
             docker compose up -d --build --remove-orphans
