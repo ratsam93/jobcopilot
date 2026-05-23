@@ -1,10 +1,10 @@
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from apps.backend.app.database import check_database
 from apps.backend.app.config import settings
@@ -38,6 +38,22 @@ app.include_router(career_vault_router, prefix="/api")
 app.include_router(campaign_router, prefix="/api")
 app.include_router(outreach_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": True, "message": str(exc.detail), "details": {"status_code": exc.status_code}},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=500,
+        content={"error": True, "message": "Internal server error", "details": {"exception": exc.__class__.__name__}},
+    )
 
 if frontend_dist.exists():
     app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")

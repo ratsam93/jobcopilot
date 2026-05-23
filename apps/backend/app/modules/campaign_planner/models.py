@@ -87,3 +87,14 @@ class JobSummary(BaseModel):
 
 class CampaignParseInput(BaseModel):
     natural_language_prompt: str | None = None
+
+
+class ManualJobInput(BaseModel):
+    company_name: str
+    role_title: str
+    source: str = "manual"
+    source_url: str | None = None
+    location: str | None = None
+    remote: bool = False
+    description: str = ""
+    required_skills: list[str] = Field(default_factory=list)

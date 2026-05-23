@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from apps.backend.app.auth import UserPublic, current_user
 
@@ -14,19 +14,68 @@ router = APIRouter()
 
 @router.post("/career-vault/resume/upload")
 async def upload_resume(
-    resume: bytes = Body(..., media_type="application/octet-stream"),
-    x_filename: str | None = Header(default=None, alias="X-Filename"),
+    request: Request,
     user: UserPublic = Depends(current_user),
 ) -> dict[str, object]:
-    if not x_filename:
-        raise HTTPException(status_code=400, detail="X-Filename header is required")
-    result = store.create_or_update_profile_from_bytes(resume, filename=x_filename)
-    return result.model_dump()
+    content_type = request.headers.get("content-type", "")
+    filename = request.headers.get("x-filename", "resume.txt")
+    payload = b""
+    resume_text = None
+    if content_type.startswith("multipart/form-data"):
+        form = await request.form()
+        resume_file = form.get("resume_file")
+        if resume_file is not None:
+            filename = getattr(resume_file, "filename", None) or filename
+            content_type = getattr(resume_file, "content_type", None) or content_type
+            payload = await resume_file.read()
+        else:
+            resume_text = form.get("resume_text")
+            if form.get("resume_filename"):
+                filename = str(form.get("resume_filename"))
+    else:
+        payload = await request.body()
+        if not payload:
+            resume_text = request.query_params.get("resume_text")
+    if resume_text is not None and not payload:
+        payload = str(resume_text).encode("utf-8")
+        content_type = "text/plain"
+    if not payload:
+        raise HTTPException(status_code=400, detail="Upload a file or provide resume_text")
+    result = store.create_or_update_profile_from_bytes(payload, filename=filename)
+    parsed_resume = store.parsed_profile(result.candidate_profile_id)
+    return {
+        "status": "success",
+        "parse_status": result.parse_status,
+        "upload_status": result.parse_status,
+        "candidate_profile_id": str(result.candidate_profile_id),
+        "profile_id": str(result.candidate_profile_id),
+        "source_filename": result.source_filename,
+        "filename": result.source_filename,
+        "content_type": content_type,
+        "file_size": len(payload),
+        "text_length": len(result.extracted_text),
+        "created_at": result.created_profile.created_at,
+        "server_saved": True,
+        "created_profile": result.created_profile.model_dump(mode="json"),
+        "parsed_resume": parsed_resume,
+        "warnings": parsed_resume.get("parser_warnings", []),
+        "raw_response": result.model_dump(mode="json"),
+    }
 
 
 @router.get("/career-vault/profile/{candidate_profile_id}")
 async def get_profile(candidate_profile_id: UUID, user: UserPublic = Depends(current_user)) -> dict[str, object]:
     return store.profile_summary(candidate_profile_id)
+
+
+@router.get("/career-vault/profiles/{candidate_profile_id}")
+async def get_profile_alias(candidate_profile_id: UUID, user: UserPublic = Depends(current_user)) -> dict[str, object]:
+    return store.profile_summary(candidate_profile_id)
+
+
+@router.get("/career-vault/profiles/{candidate_profile_id}/parsed")
+async def get_profile_parsed(candidate_profile_id: UUID, user: UserPublic = Depends(current_user)) -> dict[str, object]:
+    return store.parsed_profile(candidate_profile_id)
 
 
 @router.post("/career-vault/profile/{candidate_profile_id}/update")

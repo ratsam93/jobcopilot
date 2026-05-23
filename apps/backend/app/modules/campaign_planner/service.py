@@ -5,6 +5,12 @@ from uuid import UUID, uuid4
 
 from fastapi import HTTPException
 
+from apps.backend.app.persistence_repos import (
+    ApplicationPackageRepository,
+    AuditLogRepository,
+    ReviewItemRepository,
+    WorkflowRunRepository,
+)
 from apps.backend.app.repositories import CampaignRepository
 
 from .models import (
@@ -17,6 +23,13 @@ from .models import (
     JobSummary,
     StructuredQuery,
 )
+from ..document_generator.service import DocumentGeneratorService
+from ..email_discovery.service import EmailDiscoveryService
+from ..fit_scoring.service import FitScoringService
+from ..job_discovery.service import Job, JobDiscoveryService
+from ..outreach_generator.service import OutreachGeneratorService
+from ..people_finder.service import PersonCandidate, PeopleFinderService
+from ..review_queue.service import ReviewQueueService
 from ..career_vault.service import store as career_store
 from ..career_vault.service import utc_now
 
@@ -24,6 +37,10 @@ from ..career_vault.service import utc_now
 class CampaignPlannerStore:
     def __init__(self) -> None:
         self.repo = CampaignRepository()
+        self.workflow_repo = WorkflowRunRepository()
+        self.package_repo = ApplicationPackageRepository()
+        self.review_repo = ReviewItemRepository()
+        self.audit_repo = AuditLogRepository()
 
     def _persist(self, campaign: Campaign) -> Campaign:
         self.repo.upsert(campaign)
@@ -147,6 +164,31 @@ class CampaignPlannerStore:
         campaign = self.get_campaign(campaign_id)
         return [job.model_dump() for job in getattr(campaign, "jobs", [])]
 
+    def manual_job(self, campaign_id: UUID, payload: dict[str, object]) -> dict[str, object]:
+        campaign = self.get_campaign(campaign_id)
+        job = JobDiscoveryService.normalize(
+            Job(
+                source=str(payload.get("source", "manual")),
+                source_url=str(payload.get("source_url", f"https://manual.local/{uuid4()}")),
+                title=str(payload["role_title"]),
+                company=str(payload["company_name"]),
+                location=str(payload.get("location")) if payload.get("location") else None,
+                remote=bool(payload.get("remote", False)),
+                description=str(payload.get("description", "")),
+                required_skills=list(payload.get("required_skills", [])),
+            )
+        )
+        campaign.jobs.append(
+            JobSummary(job_id=uuid4(), campaign_id=campaign_id, title=job.title, company_name=job.company, status="queued")
+        )
+        self._persist(campaign)
+        return {
+            "campaign_id": str(campaign_id),
+            "job": job.model_dump(),
+            "status": "queued",
+            "reason": "Manual job added because no external job source is configured",
+        }
+
     def add_constraint(self, campaign_id: UUID, constraint_type: str, constraint_value: str, mandatory: bool = True) -> CampaignConstraint:
         campaign = self.get_campaign(campaign_id)
         constraint = CampaignConstraint(
@@ -158,6 +200,85 @@ class CampaignPlannerStore:
         campaign.constraints.append(constraint)
         self._persist(campaign)
         return constraint
+
+    def workflow_state(self, campaign_id: UUID) -> dict[str, object]:
+        campaign = self.get_campaign(campaign_id)
+        latest_run = campaign.runs[-1] if campaign.runs else None
+        run_payload = None
+        steps: list[dict[str, object]] = []
+        if latest_run:
+            run_payload = self.workflow_repo.get(str(latest_run.id))
+            details = (run_payload or {}).get("details_json") or {}
+            steps = self._build_steps(campaign, run_payload, details)
+        jobs = [job.model_dump() for job in getattr(campaign, "jobs", [])]
+        packages = [row for row in self.package_repo.list_all() if row.get("job_id") in {job["job_id"] for job in jobs}]
+        review_items = [row for row in self.review_repo.list_all() if row.get("review_id")]
+        activity = [entry for entry in self.audit_repo.list() if str(entry.get("payload_json", {}).get("campaign_id", "")) in {str(campaign_id), ""}]
+        return {
+            "campaign_id": str(campaign.campaign_id),
+            "run_id": run_payload["id"] if run_payload else None,
+            "status": campaign.status,
+            "current_step": self._current_step(run_payload),
+            "steps": steps,
+            "jobs": jobs,
+            "artifacts": packages,
+            "review_items": review_items,
+            "activity": activity[-20:],
+        }
+
+    def _current_step(self, run_payload: dict[str, object] | None) -> str:
+        if not run_payload:
+            return "not_started"
+        details = run_payload.get("details_json") or {}
+        return str(details.get("task") or details.get("current_step") or run_payload.get("status") or "not_started")
+
+    def _build_steps(self, campaign: Campaign, run_payload: dict[str, object] | None, details: dict[str, object]) -> list[dict[str, object]]:
+        step_names = [
+            "resume_parse",
+            "campaign_create",
+            "job_discovery",
+            "fit_scoring",
+            "document_generation",
+            "outreach_drafting",
+            "review_queue",
+            "gmail_draft",
+        ]
+        run_status = (run_payload or {}).get("status", "queued")
+        current_step = self._current_step(run_payload)
+        output_map = {
+            "job_discovery": details.get("discover_jobs"),
+            "fit_scoring": details.get("score_jobs"),
+            "document_generation": details.get("generate_documents"),
+            "outreach_drafting": details.get("generate_outreach"),
+            "review_queue": details.get("generate_outreach"),
+        }
+        steps: list[dict[str, object]] = []
+        for name in step_names:
+            status = "not_started"
+            if name == "resume_parse" and campaign.candidate_profile_id:
+                status = "complete"
+            elif name == "campaign_create":
+                status = "complete" if campaign.status in {"parsed", "running", "completed", "paused", "cancelled"} else "not_started"
+            elif name == current_step:
+                status = "running" if run_status == "running" else "complete"
+            elif output_map.get(name):
+                status = "complete"
+            elif run_status == "failed":
+                status = "failed" if name == current_step else "skipped"
+            elif campaign.status == "running":
+                status = "skipped" if name not in {current_step, "resume_parse", "campaign_create"} else "complete"
+            steps.append(
+                {
+                    "name": name,
+                    "status": status,
+                    "input": details.get(name, {}),
+                    "output": output_map.get(name),
+                    "error": details.get("error") if name == current_step and run_status == "failed" else None,
+                    "started_at": run_payload["details_json"].get("started_at") if run_payload else None,
+                    "completed_at": run_payload["details_json"].get("completed_at") if run_payload else None,
+                }
+            )
+        return steps
 
 
 store = CampaignPlannerStore()

@@ -13,6 +13,7 @@ venv/
 Thumbs.db
 *.log
 research/oss-reference/
+docs/
 **/__pycache__/
 frontend/node_modules/
 frontend/dist/

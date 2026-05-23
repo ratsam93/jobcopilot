@@ -28,7 +28,7 @@ def _workflow_context(campaign_id: str) -> dict[str, object]:
 @celery_app.task(name="run_campaign")
 def run_campaign(campaign_id: str, workflow_run_id: str | None = None) -> dict[str, object]:
     workflow_run = workflow_run_id or workflow_runs.create("run_campaign", {"campaign_id": campaign_id})["id"]
-    workflow_runs.mark_started(workflow_run, {"campaign_id": campaign_id, "task": "run_campaign"})
+    workflow_runs.mark_started(workflow_run, {"campaign_id": campaign_id, "task": "run_campaign", "current_step": "job_discovery"})
     try:
         discover_result = discover_jobs(campaign_id, workflow_run)
         score_result = score_jobs(campaign_id, workflow_run)
@@ -54,7 +54,7 @@ def run_campaign(campaign_id: str, workflow_run_id: str | None = None) -> dict[s
 @celery_app.task(name="discover_jobs")
 def discover_jobs(campaign_id: str, workflow_run_id: str | None = None) -> dict[str, object]:
     run_id = workflow_run_id or workflow_runs.create("discover_jobs", {"campaign_id": campaign_id})["id"]
-    workflow_runs.mark_started(run_id, {"campaign_id": campaign_id, "task": "discover_jobs"})
+    workflow_runs.mark_started(run_id, {"campaign_id": campaign_id, "task": "discover_jobs", "current_step": "job_discovery"})
     try:
         campaign = campaign_store.start_run(UUID(campaign_id))
         result = {"campaign_id": campaign_id, "job_count": len(campaign_store.list_jobs(UUID(campaign_id)))}
@@ -68,7 +68,7 @@ def discover_jobs(campaign_id: str, workflow_run_id: str | None = None) -> dict[
 @celery_app.task(name="score_jobs")
 def score_jobs(campaign_id: str, workflow_run_id: str | None = None) -> dict[str, object]:
     run_id = workflow_run_id or workflow_runs.create("score_jobs", {"campaign_id": campaign_id})["id"]
-    workflow_runs.mark_started(run_id, {"campaign_id": campaign_id, "task": "score_jobs"})
+    workflow_runs.mark_started(run_id, {"campaign_id": campaign_id, "task": "score_jobs", "current_step": "fit_scoring"})
     try:
         context = _workflow_context(campaign_id)
         campaign = context["campaign"]
@@ -98,7 +98,7 @@ def score_jobs(campaign_id: str, workflow_run_id: str | None = None) -> dict[str
 @celery_app.task(name="generate_documents")
 def generate_documents(campaign_id: str, workflow_run_id: str | None = None) -> dict[str, object]:
     run_id = workflow_run_id or workflow_runs.create("generate_documents", {"campaign_id": campaign_id})["id"]
-    workflow_runs.mark_started(run_id, {"campaign_id": campaign_id, "task": "generate_documents"})
+    workflow_runs.mark_started(run_id, {"campaign_id": campaign_id, "task": "generate_documents", "current_step": "document_generation"})
     try:
         context = _workflow_context(campaign_id)
         profile = context["profile"]
@@ -132,7 +132,7 @@ def generate_documents(campaign_id: str, workflow_run_id: str | None = None) -> 
 @celery_app.task(name="find_people")
 def find_people(campaign_id: str, workflow_run_id: str | None = None) -> dict[str, object]:
     run_id = workflow_run_id or workflow_runs.create("find_people", {"campaign_id": campaign_id})["id"]
-    workflow_runs.mark_started(run_id, {"campaign_id": campaign_id, "task": "find_people"})
+    workflow_runs.mark_started(run_id, {"campaign_id": campaign_id, "task": "find_people", "current_step": "outreach_drafting"})
     try:
         jobs = campaign_store.list_jobs(UUID(campaign_id))
         if not jobs:
@@ -170,7 +170,7 @@ def find_people(campaign_id: str, workflow_run_id: str | None = None) -> dict[st
 @celery_app.task(name="generate_outreach")
 def generate_outreach(campaign_id: str, workflow_run_id: str | None = None) -> dict[str, object]:
     run_id = workflow_run_id or workflow_runs.create("generate_outreach", {"campaign_id": campaign_id})["id"]
-    workflow_runs.mark_started(run_id, {"campaign_id": campaign_id, "task": "generate_outreach"})
+    workflow_runs.mark_started(run_id, {"campaign_id": campaign_id, "task": "generate_outreach", "current_step": "review_queue"})
     try:
         jobs = campaign_store.list_jobs(UUID(campaign_id))
         if not jobs:

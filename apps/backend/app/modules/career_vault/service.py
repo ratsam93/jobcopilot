@@ -265,5 +265,40 @@ class CareerVaultStore:
             "bullet_bank": profile.bullet_bank,
         }
 
+    def parsed_profile(self, candidate_profile_id: UUID) -> dict[str, object]:
+        profile = self.get_profile(candidate_profile_id)
+        skills = [skill.skill_name for skill in profile.skills]
+        claims = [claim.claim_text for claim in profile.approved_claims if claim.approved]
+        warnings: list[str] = []
+        missing_info: list[str] = []
+        if not profile.full_name:
+            missing_info.append("name")
+        if not profile.primary_email:
+            missing_info.append("email")
+        if not profile.phone:
+            missing_info.append("phone")
+        if not profile.location:
+            missing_info.append("location")
+        if not claims:
+            warnings.append("No approved claims were detected from the resume.")
+        if not skills:
+            warnings.append("No skills were detected from the resume.")
+        return {
+            "candidate_name": profile.full_name,
+            "email": profile.primary_email,
+            "phone": profile.phone,
+            "location": profile.location,
+            "summary": profile.career_story or "Parsed from resume content.",
+            "skills": skills,
+            "experience": claims[:5],
+            "projects": [bullet.bullet_text for bullet in profile.bullet_bank[:5]],
+            "education": [],
+            "certifications": [],
+            "approved_claims_boundary": claims,
+            "missing_info": missing_info,
+            "parser_warnings": warnings,
+            "raw_json": profile.model_dump(mode="json"),
+        }
+
 
 store = CareerVaultStore()

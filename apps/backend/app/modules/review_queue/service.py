@@ -48,6 +48,18 @@ class ReviewQueueService:
             raise ValueError("review must be pending")
         return ReviewDecision(review.review_id, "approved", None)
 
+    def set_status(self, review_id: str, status: str, notes: str | None = None) -> ReviewItem:
+        payload = self.repo.get(review_id)
+        if payload is None:
+            raise KeyError(review_id)
+        payload["status"] = status
+        payload["review_notes"] = notes
+        self.repo.upsert(review_id, payload)
+        return ReviewItem(**payload)
+
+    def list_all(self) -> list[ReviewItem]:
+        return [ReviewItem(**item) for item in self.repo.list_all()]
+
     def gmail_draft_payload(self, draft: OutreachDraft) -> dict[str, str]:
         if draft.status != "review_pending":
             raise ValueError("draft must be pending review")
