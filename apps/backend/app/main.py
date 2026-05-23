@@ -46,6 +46,11 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/api/health")
+async def api_health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
 @app.get("/health/dependencies")
 async def dependency_health() -> dict[str, str]:
     return {
@@ -56,8 +61,26 @@ async def dependency_health() -> dict[str, str]:
     }
 
 
+@app.get("/api/health/dependencies")
+async def api_dependency_health() -> dict[str, str]:
+    return {
+        "app_env": settings.app_env,
+        "database_url": settings.database_url,
+        "redis_url": settings.redis_url,
+        "qdrant_url": settings.qdrant_url or "unset",
+    }
+
+
 @app.get("/health/database")
 async def database_health() -> dict[str, str]:
+    return {
+        "status": "ok" if check_database(settings.database_url) else "unavailable",
+        "database_url": settings.database_url,
+    }
+
+
+@app.get("/api/health/database")
+async def api_database_health() -> dict[str, str]:
     return {
         "status": "ok" if check_database(settings.database_url) else "unavailable",
         "database_url": settings.database_url,
