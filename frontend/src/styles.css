@@ -51,11 +51,12 @@ textarea {
   padding: 24px;
 }
 
-.topbar {
+.hero {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  gap: 24px;
+  align-items: stretch;
+  margin-bottom: 18px;
 }
 
 .health {
@@ -63,6 +64,77 @@ textarea {
   border: 1px solid #334155;
   padding: 8px 12px;
   border-radius: 999px;
+}
+
+.hero-copy {
+  flex: 1;
+  background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+  border: 1px solid #243041;
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: #60a5fa;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.hero-copy h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.lede {
+  margin: 10px 0 0;
+  color: #cbd5e1;
+  max-width: 760px;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.hero-card {
+  width: 300px;
+  display: grid;
+  gap: 10px;
+}
+
+.hero-stat,
+.strip-item {
+  background: #111827;
+  border: 1px solid #243041;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.hero-stat span,
+.strip-item span {
+  color: #94a3b8;
+}
+
+.hero-stat strong,
+.strip-item strong {
+  color: #e5e7eb;
+  text-align: right;
+}
+
+.status-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .grid {
@@ -117,15 +189,29 @@ label {
   color: #fca5a5;
 }
 
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
 @media (max-width: 900px) {
+  .hero,
+  .status-strip,
+  .status-grid {
+    grid-template-columns: 1fr;
+  }
+
   .grid {
     grid-template-columns: 1fr;
   }
 
-  .topbar {
+  .hero {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
+  }
+
+  .hero-card {
+    width: 100%;
   }
 }
-

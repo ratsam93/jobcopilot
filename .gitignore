@@ -16,3 +16,4 @@ research/oss-reference/
 **/__pycache__/
 frontend/node_modules/
 frontend/dist/
+jobcopilot.db

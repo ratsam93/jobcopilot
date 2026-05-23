@@ -1,62 +1,106 @@
 # Job Copilot Platform
 
-Backend-first modular monolith for AI-assisted job search and campaign execution, with a separate React/Vite frontend.
+Production-oriented job search and campaign workflow stack with a separate React/Vite frontend, a FastAPI backend, and Docker Compose deployment.
 
-## Status
+## Repository layout
 
-- Spec scaffold created.
-- Implementation has not started yet.
-- SRS 2.0 repository strategy is now documented under `docs/srs/`.
-- Frontend lives in `frontend/`.
-- Backend lives in `apps/backend/`.
+- `apps/backend/` - FastAPI API, workflow services, database bootstrap, worker entrypoint
+- `frontend/` - React + Vite UI
+- `docker-compose.yml` - production/local compose stack
+- `requirements.txt` - runtime Python dependencies for the backend
+- `requirements-dev.txt` - runtime dependencies plus test tooling
+- `.env.example` - environment template for the server
+- `tests/` - integration, end-to-end, and unit coverage
+- `docs/` - SRS and planning documents
+- `research/oss-reference/` - cloned OSS reference repos only
 
-## Specs
+## Production dependencies
 
-- `specs/job-copilot-backend/plan.md`
-- `specs/job-copilot-backend/tasks.md`
-- `docs/srs/SRS-2.0-Repo-Clone-and-Modular-Build-Update.md`
+Install the backend runtime requirements on the server:
 
-## Frontend
+```bash
+python -m pip install -r requirements.txt
+```
 
-- `frontend/`
-- `cd frontend && npm install`
-- `cd frontend && npm run dev`
+For local development and tests:
 
-## Backend
+```bash
+python -m pip install -r requirements-dev.txt
+```
 
-- `apps/backend/`
-- `python -m uvicorn apps.backend.app.main:app --reload`
+## Run with Docker Compose
 
-## Docker Deployment
+Start the full stack:
 
-This repository is configured for Docker Compose deployment to a Contabo VPS.
+```bash
+docker compose up -d --build
+```
 
-### Runtime layout
+Services:
 
-- The root `Dockerfile` builds the Vite frontend and packages it into the FastAPI image.
-- The backend serves the SPA from `/` and the API from `/api/*`.
-- `docker-compose.yml` runs a single production container named `jobcopilot`.
+- frontend: `http://127.0.0.1:3000`
+- backend health: `http://127.0.0.1:8000/health`
+- database health: `http://127.0.0.1:8000/health/database`
 
-### Required GitHub Secrets
+Check status and logs:
+
+```bash
+docker compose ps
+docker compose logs -f
+```
+
+Stop the stack:
+
+```bash
+docker compose down
+```
+
+## Run locally without Docker
+
+Backend:
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m uvicorn apps.backend.app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Tests
+
+Run the complete backend test pack:
+
+```bash
+pytest tests -q
+```
+
+Build the frontend:
+
+```bash
+cd frontend
+npm run build
+```
+
+## Deployment
+
+GitHub Actions deploys to the VPS at `/opt/projects/jobcopilot` using the repository copy on `main`.
+
+Required secrets:
 
 - `HOST`
 - `USERNAME`
 - `PORT`
 - `SSH_KEY`
 
-### Deployment flow
+## Notes
 
-1. Push to `main`.
-2. GitHub Actions syncs the repository to `/opt/projects/jobcopilot` over SSH.
-3. The workflow runs `docker compose up -d --build --remove-orphans` on the VPS.
-
-### Server prerequisites
-
-- Docker and Docker Compose v2 installed on the VPS.
-- SSH access for the GitHub Actions deploy user.
-- The target folder `/opt/projects/jobcopilot` must exist and be writable.
-
-### Local production test
-
-- `docker compose up --build`
-- Open `http://localhost:8000`
+- PostgreSQL and Redis are included in Compose.
+- The backend currently persists the initial schema and health checks; domain services are still being migrated from in-memory stores.
+- OSS reference clones stay under `research/oss-reference/` and are not part of the production runtime.
+- The old root-level single-container `Dockerfile` has been removed. Use `apps/backend/Dockerfile` and `frontend/Dockerfile` through Compose.

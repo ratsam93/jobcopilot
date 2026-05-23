@@ -73,13 +73,51 @@ export default function App() {
 
   return (
     <main className="shell">
-      <header className="topbar">
-        <div>
-          <h1>Job Copilot</h1>
-          <p>Backend-connected job campaign workspace</p>
+      <header className="hero">
+        <div className="hero-copy">
+          <p className="eyebrow">Job Copilot Platform</p>
+          <h1>Run job campaigns from one control surface.</h1>
+          <p className="lede">
+            Upload a resume, create a campaign, and execute the workflow against the backend without sending anything
+            until approval.
+          </p>
+          <div className="hero-actions">
+            <button onClick={handleCampaignRun} disabled={!campaignId}>
+              Execute
+            </button>
+            <span className="health">Backend: {health}</span>
+          </div>
         </div>
-        <div className="health">Backend: {health}</div>
+        <div className="hero-card">
+          <div className="hero-stat">
+            <span>Campaign</span>
+            <strong>{stats.status}</strong>
+          </div>
+          <div className="hero-stat">
+            <span>Approval</span>
+            <strong>{stats.approval}</strong>
+          </div>
+          <div className="hero-stat">
+            <span>Jobs</span>
+            <strong>{stats.jobs}</strong>
+          </div>
+        </div>
       </header>
+
+      <section className="status-strip">
+        <div className="strip-item">
+          <span>Profile</span>
+          <strong>{profileId || 'not created'}</strong>
+        </div>
+        <div className="strip-item">
+          <span>Campaign</span>
+          <strong>{campaignId || 'not created'}</strong>
+        </div>
+        <div className="strip-item">
+          <span>Queued jobs</span>
+          <strong>{campaignJobs.length}</strong>
+        </div>
+      </section>
 
       <section className="grid">
         <article className="panel">
@@ -108,25 +146,27 @@ export default function App() {
           </button>
           <div className="meta">Campaign ID: {campaignId || 'not created'}</div>
         </article>
+      </section>
 
-        <article className="panel">
-          <h2>Workflow Status</h2>
+      <section className="panel wide">
+        <h2>Workflow Status</h2>
+        <div className="status-grid">
           <div className="stat">Campaign status: {stats.status}</div>
           <div className="stat">Approval mode: {stats.approval}</div>
           <div className="stat">Jobs discovered: {stats.jobs}</div>
-          <pre className="json">{campaignStatus ? JSON.stringify(campaignStatus, null, 2) : 'No status yet'}</pre>
-        </article>
+        </div>
+        <pre className="json">{campaignStatus ? JSON.stringify(campaignStatus, null, 2) : 'No status yet'}</pre>
+      </section>
 
-        <article className="panel">
-          <h2>Activity Log</h2>
-          <ul className="loglist">
-            {logs.map((item, index) => (
-              <li key={`${item.message}-${index}`} className={item.kind}>
-                {item.message}
-              </li>
-            ))}
-          </ul>
-        </article>
+      <section className="panel wide">
+        <h2>Activity Log</h2>
+        <ul className="loglist">
+          {logs.map((item, index) => (
+            <li key={`${item.message}-${index}`} className={item.kind}>
+              {item.message}
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="panel wide">
@@ -136,4 +176,3 @@ export default function App() {
     </main>
   )
 }
-

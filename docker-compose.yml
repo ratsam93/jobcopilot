@@ -1,25 +1,65 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: jobcopilot-postgres
+    environment:
+      POSTGRES_DB: jobcopilot
+      POSTGRES_USER: jobcopilot
+      POSTGRES_PASSWORD: jobcopilot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: jobcopilot-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
   backend:
     container_name: jobcopilot-backend
-    image: python:3.12-slim
-    working_dir: /app
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
     environment:
-      PYTHONDONTWRITEBYTECODE: "1"
-      PYTHONUNBUFFERED: "1"
-    command: sh -c "pip install --no-cache-dir fastapi uvicorn pydantic && pip install --no-cache-dir -e . && uvicorn apps.backend.app.main:app --host 0.0.0.0 --port 8000"
-    volumes:
-      - .:/app
-    expose:
-      - "8000"
+      APP_ENV: production
+      JOBCOPILOT_DATABASE_URL: postgresql+psycopg://jobcopilot:jobcopilot@postgres:5432/jobcopilot
+      JOBCOPILOT_REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  worker:
+    container_name: jobcopilot-worker
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    command: ["python", "-m", "apps.backend.app.worker"]
+    environment:
+      APP_ENV: production
+      JOBCOPILOT_DATABASE_URL: postgresql+psycopg://jobcopilot:jobcopilot@postgres:5432/jobcopilot
+      JOBCOPILOT_REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
     restart: unless-stopped
 
   frontend:
     container_name: jobcopilot-frontend
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: frontend/Dockerfile
     ports:
       - "3000:3000"
     depends_on:
       - backend
     restart: unless-stopped
+
+volumes:
+  postgres_data:
