@@ -94,15 +94,12 @@ jobs:
           REPO_URL: https://github.com/${{ github.repository }}.git
           BRANCH: main
           DEPLOY_DIR: /opt/projects/jobcopilot
-          JOBCOPILOT_ADMIN_EMAIL: ${{ secrets.JOBCOPILOT_ADMIN_EMAIL }}
-          JOBCOPILOT_ADMIN_PASSWORD: ${{ secrets.JOBCOPILOT_ADMIN_PASSWORD }}
-          JOBCOPILOT_SECRET_KEY: ${{ secrets.JOBCOPILOT_SECRET_KEY }}
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.PORT }}
-          envs: REPO_URL,BRANCH,DEPLOY_DIR,JOBCOPILOT_ADMIN_EMAIL,JOBCOPILOT_ADMIN_PASSWORD,JOBCOPILOT_SECRET_KEY
+          envs: REPO_URL,BRANCH,DEPLOY_DIR
           script: |
             set -euo pipefail
 
@@ -118,12 +115,21 @@ jobs:
             git fetch origin "$BRANCH"
             git reset --hard "origin/$BRANCH"
 
-            {
-              printf 'JOBCOPILOT_ADMIN_EMAIL=%s\n' "$JOBCOPILOT_ADMIN_EMAIL"
-              printf 'JOBCOPILOT_ADMIN_PASSWORD=%s\n' "$JOBCOPILOT_ADMIN_PASSWORD"
-              printf 'JOBCOPILOT_SECRET_KEY=%s\n' "$JOBCOPILOT_SECRET_KEY"
-            } > .env
+            cat > .env <<'JOBCOPILOT_ENV'
+            JOBCOPILOT_ADMIN_EMAIL=${{ secrets.JOBCOPILOT_ADMIN_EMAIL }}
+            JOBCOPILOT_ADMIN_PASSWORD=${{ secrets.JOBCOPILOT_ADMIN_PASSWORD }}
+            JOBCOPILOT_SECRET_KEY=${{ secrets.JOBCOPILOT_SECRET_KEY }}
+            JOBCOPILOT_ENV
+            sed -i 's/^[[:space:]]*//' .env
             chmod 600 .env
+            if grep -q '<' .env; then
+              echo ".env still contains placeholder-style values. Check GitHub Actions secrets."
+              exit 1
+            fi
+            if ! grep -q '^JOBCOPILOT_ADMIN_PASSWORD=.' .env; then
+              echo ".env was written, but JOBCOPILOT_ADMIN_PASSWORD is empty."
+              exit 1
+            fi
 
             docker compose down --remove-orphans
             docker compose up -d --build --remove-orphans
