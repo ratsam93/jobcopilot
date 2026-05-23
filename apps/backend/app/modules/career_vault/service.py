@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import re
+from io import BytesIO
 from pathlib import Path
 from uuid import UUID
 
 from fastapi import HTTPException
+from docx import Document
+from pypdf import PdfReader
 
 from apps.backend.app.repositories import CareerProfileRepository
 from apps.backend.app.shared.contracts import ResumeParseResult
@@ -194,12 +197,53 @@ class CareerVaultStore:
         suffix = Path(filename).suffix.lower()
         if suffix and suffix not in SUPPORTED_SUFFIXES:
             raise HTTPException(status_code=400, detail="Unsupported file type")
-        text = content.decode("utf-8", errors="ignore")
+        text = self._extract_text_from_bytes(content, filename)
+        if not text.strip():
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "Could not extract readable resume text from uploaded file",
+                    "filename": filename,
+                    "supported_types": sorted(SUPPORTED_SUFFIXES),
+                },
+            )
         return self.parse_resume_text(text=text, filename=filename)
 
+    def _extract_text_from_bytes(self, content: bytes, filename: str) -> str:
+        suffix = Path(filename).suffix.lower()
+        if suffix == ".pdf":
+            try:
+                reader = PdfReader(BytesIO(content))
+                return "\n".join((page.extract_text() or "").strip() for page in reader.pages).strip()
+            except Exception as exc:
+                raise HTTPException(status_code=422, detail=f"PDF text extraction failed: {exc}") from exc
+        if suffix == ".docx":
+            try:
+                document = Document(BytesIO(content))
+                paragraphs = [paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text.strip()]
+                table_cells: list[str] = []
+                for table in document.tables:
+                    for row in table.rows:
+                        for cell in row.cells:
+                            if cell.text.strip():
+                                table_cells.append(cell.text.strip())
+                return "\n".join(paragraphs + table_cells).strip()
+            except Exception as exc:
+                raise HTTPException(status_code=422, detail=f"DOCX text extraction failed: {exc}") from exc
+        return content.decode("utf-8-sig", errors="ignore")
+
     def _extract_email(self, text: str) -> str | None:
-        match = re.search(r"[\w.\-+]+@[\w.\-]+\.\w+", text)
-        return match.group(0) if match else None
+        matches = re.findall(r"[\w.\-+]+@[\w.\-]+\.\w+", text)
+        if not matches:
+            return None
+        email = matches[0]
+        local, domain = email.split("@", 1)
+        compact_name = re.sub(r"[^a-z]", "", self._extract_name(text) or "", flags=re.IGNORECASE).lower()
+        if compact_name and local.lower().startswith(compact_name):
+            local = local[len(compact_name) :]
+        elif len(local) > 32:
+            local = re.split(r"(?<=[a-z])(?=[A-Z])", local)[-1]
+        return f"{local}@{domain}" if local else email
 
     def _extract_phone(self, text: str) -> str | None:
         match = re.search(r"(\+?\d[\d\s().-]{7,}\d)", text)

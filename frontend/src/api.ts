@@ -131,6 +131,13 @@ async function fallback<T>(task: Promise<T>, mockValue: T): Promise<T> {
   }
 }
 
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    throw new ApiError(response.status, await response.text())
+  }
+  return response.json() as Promise<T>
+}
+
 export const api = {
   login: (username: string, password: string) =>
     isDemoMode()
@@ -197,45 +204,11 @@ export const api = {
     }
     const form = new FormData()
     form.append('resume_file', file)
-    return fallback(
-      fetch(`${baseUrl}/career-vault/resume/upload`, {
+    return fetch(`${baseUrl}/career-vault/resume/upload`, {
         method: 'POST',
         headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
         body: form,
-      }).then(async (response) => {
-        if (!response.ok) throw new ApiError(response.status, await response.text())
-        return response.json() as Promise<ResumeUploadResult>
-      }),
-      {
-        status: 'success',
-        upload_status: 'mocked',
-        profile_id: mockId('profile'),
-        filename: file.name,
-        content_type: file.type || 'application/octet-stream',
-        file_size: file.size,
-        text_length: 0,
-        created_at: new Date().toISOString(),
-        server_saved: true,
-        parsed_resume: {
-          candidate_name: 'Sam Patel',
-          email: 'sam.patel@example.com',
-          phone: '+1 555 0100',
-          location: 'Remote',
-          summary: 'Demo parsed resume.',
-          skills: ['FastAPI', 'Postgres', 'Docker'],
-          experience: ['Built AI automation workflows for consulting clients.'],
-          projects: [],
-          education: [],
-          certifications: [],
-          approved_claims_boundary: ['Built AI automation workflows for consulting clients.'],
-          missing_info: ['education'],
-          parser_warnings: [],
-          raw_json: {},
-        },
-        warnings: [],
-        raw_response: {},
-      },
-    )
+      }).then((response) => parseJsonResponse<ResumeUploadResult>(response))
   },
   saveResumeText: (fileName: string, resumeText: string) =>
     isDemoMode()
@@ -268,8 +241,7 @@ export const api = {
           warnings: [],
           raw_response: {},
         } as ResumeUploadResult)
-      : fallback(
-          fetch(`${baseUrl}/career-vault/resume/upload`, {
+      : fetch(`${baseUrl}/career-vault/resume/upload`, {
             method: 'POST',
             headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
             body: (() => {
@@ -278,40 +250,7 @@ export const api = {
               form.append('resume_filename', fileName)
               return form
             })(),
-          }).then(async (response) => {
-            if (!response.ok) throw new ApiError(response.status, await response.text())
-            return response.json() as Promise<ResumeUploadResult>
-          }),
-          {
-            status: 'success',
-            upload_status: 'mocked',
-            profile_id: mockId('profile'),
-            filename: fileName,
-            content_type: 'text/plain',
-            file_size: resumeText.length,
-            text_length: resumeText.length,
-            created_at: new Date().toISOString(),
-            server_saved: true,
-            parsed_resume: {
-              candidate_name: 'Sam Patel',
-              email: 'sam.patel@example.com',
-              phone: '+1 555 0100',
-              location: 'Remote',
-              summary: 'Demo parsed resume.',
-              skills: ['FastAPI', 'Postgres', 'Docker'],
-              experience: ['Built AI automation workflows for consulting clients.'],
-              projects: [],
-              education: [],
-              certifications: [],
-              approved_claims_boundary: ['Built AI automation workflows for consulting clients.'],
-              missing_info: ['education'],
-              parser_warnings: [],
-              raw_json: {},
-            },
-            warnings: [],
-            raw_response: {},
-          },
-        ),
+          }).then((response) => parseJsonResponse<ResumeUploadResult>(response)),
   createCampaign: (payload: { natural_language_prompt: string; execution_mode: string; candidate_profile_id?: string }) =>
     isDemoMode()
       ? Promise.resolve({

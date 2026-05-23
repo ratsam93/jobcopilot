@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 
+from docx import Document
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect
 
@@ -51,3 +53,33 @@ def test_resume_upload_creates_career_vault_profile() -> None:
     body = response.json()
     assert body["parse_status"] == "parsed"
     assert body["created_profile"]["full_name"] == "Sam Patel"
+
+
+def test_resume_upload_accepts_real_multipart_docx_file() -> None:
+    document = Document()
+    document.add_paragraph("Maya Chen")
+    document.add_paragraph("maya@example.com")
+    document.add_paragraph("Remote USA")
+    document.add_paragraph("- Built Docker FastAPI Postgres systems")
+    buffer = BytesIO()
+    document.save(buffer)
+
+    response = client.post(
+        "/api/career-vault/resume/upload",
+        files={
+            "resume_file": (
+                "maya_resume.docx",
+                buffer.getvalue(),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "success"
+    assert body["server_saved"] is True
+    assert body["filename"] == "maya_resume.docx"
+    assert body["content_type"] == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    assert body["parsed_resume"]["candidate_name"] == "Maya Chen"
+    assert body["parsed_resume"]["email"] == "maya@example.com"

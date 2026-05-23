@@ -317,6 +317,7 @@ export default function App() {
   const handleLogin = async () => {
     setLoginBusy(true)
     try {
+      setDemoMode(false)
       const response = await apiCall('login', '/api/auth/login', () => api.login(email, password), { email }, 'auth')
       setToken(response.access_token)
       setTokenState(response.access_token)
@@ -937,7 +938,7 @@ export default function App() {
                             Browse Files
                           </button>
                           <button onClick={handleUploadResumeFile} disabled={!resumeFile}>
-                            Process Document
+                            {isDemoMode() ? 'Process Demo Document' : 'Upload and Parse Document'}
                           </button>
                         </div>
                         {!resumeFile && (
@@ -981,7 +982,7 @@ export default function App() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div>
                           <h3 style={{ margin: '0 0 6px 0', fontSize: '22px', fontFamily: 'var(--font-display)', fontWeight: 700, color: '#fff' }}>
-                            {String(activeProfile.candidate_name ?? 'Sam Patel')}
+                            {String(activeProfile.candidate_name ?? 'Name not detected')}
                           </h3>
                           
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
@@ -994,7 +995,7 @@ export default function App() {
                         <div>
                           <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Professional Summary</h4>
                           <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.5, color: 'var(--text-main)' }}>
-                            {String(activeProfile.summary ?? 'AI consulting professional with experience building robust workflows.')}
+                            {String(activeProfile.summary ?? 'No summary was detected from the uploaded resume.')}
                           </p>
                         </div>
 
