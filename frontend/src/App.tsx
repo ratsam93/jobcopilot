@@ -6,9 +6,53 @@ type LogLine = { kind: 'info' | 'error'; message: string }
 const samplePrompt =
   'Apply to top technology companies across the USA where I am fit. Prepare resume, cover letter, find hiring manager and recruiter, but do not send anything without my approval.'
 
+const workflowSteps = [
+  {
+    title: '1. Intake',
+    body: 'Upload the resume and create a Career Vault profile with approved claims, skills, and do-not-claim guardrails.',
+  },
+  {
+    title: '2. Parse',
+    body: 'Convert the campaign prompt into a structured query with countries, locations, fit thresholds, and asset preferences.',
+  },
+  {
+    title: '3. Discover',
+    body: 'Normalize jobs, remove duplicates, score fit, and shortlist only the jobs that pass the threshold.',
+  },
+  {
+    title: '4. Prepare',
+    body: 'Generate the tailored resume, cover letter, recruiter email, hiring manager email, referral note, and call script.',
+  },
+  {
+    title: '5. Approve',
+    body: 'Keep everything pending_review until a human approves drafts and the system can create final sendable artifacts.',
+  },
+]
+
+const apiMap = [
+  { method: 'GET', path: '/api/health', description: 'Backend status for the UI shell.' },
+  { method: 'GET', path: '/api/health/database', description: 'Postgres readiness and connection check.' },
+  { method: 'POST', path: '/api/career-vault/resume/upload', description: 'Create or update a Career Vault profile from the resume text.' },
+  { method: 'POST', path: '/api/campaigns/create', description: 'Parse the campaign prompt into structured campaign JSON.' },
+  { method: 'POST', path: '/api/campaigns/{campaign_id}/run', description: 'Run discovery, scoring, packaging, and review staging.' },
+  { method: 'GET', path: '/api/campaigns/{campaign_id}/status', description: 'Fetch campaign status and current workflow state.' },
+  { method: 'GET', path: '/api/campaigns/{campaign_id}/jobs', description: 'List shortlisted jobs queued by the campaign.' },
+]
+
+const applicationFlow = [
+  'Resume upload creates the Career Vault profile.',
+  'Campaign prompt is parsed into a structured query.',
+  'Job discovery normalizes sources and removes duplicates.',
+  'Fit scorer filters out wrong-fit jobs.',
+  'Document generator produces tailored resume and outreach drafts.',
+  'Review queue holds everything until approval.',
+]
+
 export default function App() {
   const [health, setHealth] = useState<string>('unknown')
-  const [resumeText, setResumeText] = useState<string>('Sam Patel\nAI Consultant\n\nAI automation, FastAPI, SQL, Postgres, Docker, AWS, LLMs\n\n- Built AI automation workflows for consulting clients.\n- Led backend APIs using FastAPI and SQL.\n')
+  const [resumeText, setResumeText] = useState<string>(
+    'Sam Patel\nAI Consultant\n\nAI automation, FastAPI, SQL, Postgres, Docker, AWS, LLMs\n\n- Built AI automation workflows for consulting clients.\n- Led backend APIs using FastAPI and SQL.\n',
+  )
   const [resumeFileName, setResumeFileName] = useState('sample_resume_ai_consultant.txt')
   const [profileId, setProfileId] = useState<string>('')
   const [campaignPrompt, setCampaignPrompt] = useState(samplePrompt)
@@ -17,21 +61,35 @@ export default function App() {
   const [campaignJobs, setCampaignJobs] = useState<Array<Record<string, unknown>>>([])
   const [logs, setLogs] = useState<LogLine[]>([])
 
+  const refreshHealth = async () => {
+    try {
+      const value = await api.health()
+      setHealth(value.status)
+    } catch {
+      setHealth('offline')
+    }
+  }
+
   useEffect(() => {
-    api.health()
-      .then((value) => setHealth(value.status))
-      .catch(() => setHealth('offline'))
+    void refreshHealth()
   }, [])
 
-  const stats = useMemo(() => {
-    return {
+  const stats = useMemo(
+    () => ({
       jobs: campaignJobs.length,
       status: String(campaignStatus?.status ?? 'not started'),
       approval: String(campaignStatus?.execution_mode ?? 'approval_required'),
-    }
-  }, [campaignJobs.length, campaignStatus])
+    }),
+    [campaignJobs.length, campaignStatus],
+  )
 
   const pushLog = (kind: LogLine['kind'], message: string) => setLogs((items) => [{ kind, message }, ...items].slice(0, 12))
+
+  const refreshCampaign = async (id: string) => {
+    const [status, jobs] = await Promise.all([api.campaignStatus(id), api.campaignJobs(id)])
+    setCampaignStatus(status)
+    setCampaignJobs(jobs)
+  }
 
   const handleResumeUpload = async () => {
     try {
@@ -61,29 +119,39 @@ export default function App() {
     if (!campaignId) return
     try {
       await api.runCampaign(campaignId)
-      const status = await api.campaignStatus(campaignId)
-      const jobs = await api.campaignJobs(campaignId)
-      setCampaignStatus(status)
-      setCampaignJobs(jobs)
-      pushLog('info', `Campaign run completed with ${jobs.length} queued jobs`)
+      await refreshCampaign(campaignId)
+      pushLog('info', `Campaign run completed with ${campaignJobs.length} queued jobs`)
     } catch (error) {
       pushLog('error', `Campaign run failed: ${String(error)}`)
     }
   }
 
+  const handleRefreshStatus = async () => {
+    if (!campaignId) return
+    try {
+      await refreshCampaign(campaignId)
+      pushLog('info', 'Campaign status refreshed')
+    } catch (error) {
+      pushLog('error', `Status refresh failed: ${String(error)}`)
+    }
+  }
+
   return (
     <main className="shell">
-      <header className="hero">
+      <section className="hero">
         <div className="hero-copy">
           <p className="eyebrow">Job Copilot Platform</p>
           <h1>Run job campaigns from one control surface.</h1>
           <p className="lede">
-            Upload a resume, create a campaign, and execute the workflow against the backend without sending anything
-            until approval.
+            The UI now follows the real workflow: intake, parse, discover, prepare, and approve. It also shows the
+            API surfaces that back each step so the flow is explicit instead of hidden.
           </p>
           <div className="hero-actions">
             <button onClick={handleCampaignRun} disabled={!campaignId}>
-              Execute
+              Execute flow
+            </button>
+            <button className="secondary" onClick={handleRefreshStatus} disabled={!campaignId}>
+              Refresh status
             </button>
             <span className="health">Backend: {health}</span>
           </div>
@@ -102,9 +170,9 @@ export default function App() {
             <strong>{stats.jobs}</strong>
           </div>
         </div>
-      </header>
+      </section>
 
-      <section className="status-strip">
+      <section className="topbar">
         <div className="strip-item">
           <span>Profile</span>
           <strong>{profileId || 'not created'}</strong>
@@ -117,6 +185,58 @@ export default function App() {
           <span>Queued jobs</span>
           <strong>{campaignJobs.length}</strong>
         </div>
+      </section>
+
+      <section className="grid">
+        <article className="panel">
+          <h2>Workflow Flow</h2>
+          <div className="timeline">
+            {workflowSteps.map((step) => (
+              <div key={step.title} className="timeline-item">
+                <h3>{step.title}</h3>
+                <p>{step.body}</p>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="panel">
+          <h2>What Gets Created</h2>
+          <ul className="checklist">
+            <li>Tailored resume from approved claims only.</li>
+            <li>Cover letter, recruiter email, hiring manager email.</li>
+            <li>Referral note and call script for follow-up outreach.</li>
+            <li>Job shortlist with deduped, scored opportunities.</li>
+            <li>Pending review state before anything is sent.</li>
+          </ul>
+        </article>
+      </section>
+
+      <section className="grid">
+        <article className="panel">
+          <h2>How A Job Is Applied</h2>
+          <ol className="ordered">
+            {applicationFlow.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ol>
+          <div className="meta">
+            Send gate: no email or submission is allowed until approval is explicitly granted.
+          </div>
+        </article>
+
+        <article className="panel">
+          <h2>API Connections</h2>
+          <div className="api-table">
+            {apiMap.map((item) => (
+              <div key={item.path} className="api-row">
+                <span className="api-method">{item.method}</span>
+                <code>{item.path}</code>
+                <p>{item.description}</p>
+              </div>
+            ))}
+          </div>
+        </article>
       </section>
 
       <section className="grid">
@@ -148,14 +268,35 @@ export default function App() {
         </article>
       </section>
 
-      <section className="panel wide">
-        <h2>Workflow Status</h2>
-        <div className="status-grid">
-          <div className="stat">Campaign status: {stats.status}</div>
-          <div className="stat">Approval mode: {stats.approval}</div>
-          <div className="stat">Jobs discovered: {stats.jobs}</div>
-        </div>
-        <pre className="json">{campaignStatus ? JSON.stringify(campaignStatus, null, 2) : 'No status yet'}</pre>
+      <section className="grid">
+        <article className="panel">
+          <h2>Workflow Status</h2>
+          <div className="status-grid">
+            <div className="stat">Campaign status: {stats.status}</div>
+            <div className="stat">Approval mode: {stats.approval}</div>
+            <div className="stat">Jobs discovered: {stats.jobs}</div>
+          </div>
+          <pre className="json">{campaignStatus ? JSON.stringify(campaignStatus, null, 2) : 'No status yet'}</pre>
+        </article>
+
+        <article className="panel">
+          <h2>Generated Output</h2>
+          <div className="artifact-card">
+            <h3>Resume / Cover Letter / Outreach</h3>
+            <p>Generated after the campaign is run, then held in review until approved.</p>
+          </div>
+          <div className="artifact-card">
+            <h3>Email Signing</h3>
+            <p>
+              The system should sign outbound drafts with the authenticated account after the review gate clears. The
+              UI highlights this as the final approval step rather than auto-send.
+            </p>
+          </div>
+          <div className="artifact-card">
+            <h3>Approval Status</h3>
+            <p>Nothing is sent or submitted until the workflow status moves from pending_review to approved.</p>
+          </div>
+        </article>
       </section>
 
       <section className="panel wide">
