@@ -36,14 +36,14 @@ class TokenResponse(BaseModel):
 
 
 class AuthService:
-    def create_demo_user_if_missing(self) -> None:
+    def create_initial_admin_user_if_missing(self) -> None:
         with session_scope() as session:
             if session.query(UserRow).count():
                 return
             user = UserRow(
                 id=str(uuid4()),
-                email="admin@jobcopilot.local",
-                hashed_password=self.hash_password("admin123"),
+                email=os.getenv("JOBCOPILOT_ADMIN_EMAIL", "admin@jobcopilot.local").lower(),
+                hashed_password=self.hash_password(os.getenv("JOBCOPILOT_ADMIN_PASSWORD", "admin123")),
             )
             session.add(user)
 
@@ -88,9 +88,9 @@ def decode_token(token: str) -> dict[str, object]:
 
 def current_user(token: Annotated[str | None, Depends(oauth2_scheme)]) -> UserPublic:
     if not token and settings.app_env != "production":
-        auth_service.create_demo_user_if_missing()
+        auth_service.create_initial_admin_user_if_missing()
         with session_scope() as session:
-            user = session.query(UserRow).filter(UserRow.email == "admin@jobcopilot.local").one()
+            user = session.query(UserRow).filter(UserRow.email == os.getenv("JOBCOPILOT_ADMIN_EMAIL", "admin@jobcopilot.local").lower()).one()
             return UserPublic(id=UUID(user.id), email=user.email, created_at=user.created_at)
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")

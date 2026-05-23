@@ -19,7 +19,7 @@ from apps.backend.app.modules.outreach_generator.api import router as outreach_r
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     initialize_database()
-    auth_service.create_demo_user_if_missing()
+    auth_service.create_initial_admin_user_if_missing()
     yield
 
 

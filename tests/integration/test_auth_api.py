@@ -10,7 +10,7 @@ client = TestClient(app)
 
 
 def test_login_returns_jwt_and_user_without_detached_session_error() -> None:
-    auth_service.create_demo_user_if_missing()
+    auth_service.create_initial_admin_user_if_missing()
 
     response = client.post(
         "/api/auth/login",

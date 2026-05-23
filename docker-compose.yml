@@ -34,6 +34,9 @@ services:
       DATABASE_URL: postgresql+psycopg://jobcopilot:jobcopilot@postgres:5432/jobcopilot
       JOBCOPILOT_DATABASE_URL: postgresql+psycopg://jobcopilot:jobcopilot@postgres:5432/jobcopilot
       JOBCOPILOT_REDIS_URL: redis://redis:6379/0
+      JOBCOPILOT_ADMIN_EMAIL: ${JOBCOPILOT_ADMIN_EMAIL:?set JOBCOPILOT_ADMIN_EMAIL in .env}
+      JOBCOPILOT_ADMIN_PASSWORD: ${JOBCOPILOT_ADMIN_PASSWORD:?set JOBCOPILOT_ADMIN_PASSWORD in .env}
+      JOBCOPILOT_SECRET_KEY: ${JOBCOPILOT_SECRET_KEY:?set JOBCOPILOT_SECRET_KEY in .env}
     ports:
       - "8000:8000"
     depends_on:
@@ -56,6 +59,9 @@ services:
       JOBCOPILOT_REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      JOBCOPILOT_ADMIN_EMAIL: ${JOBCOPILOT_ADMIN_EMAIL:?set JOBCOPILOT_ADMIN_EMAIL in .env}
+      JOBCOPILOT_ADMIN_PASSWORD: ${JOBCOPILOT_ADMIN_PASSWORD:?set JOBCOPILOT_ADMIN_PASSWORD in .env}
+      JOBCOPILOT_SECRET_KEY: ${JOBCOPILOT_SECRET_KEY:?set JOBCOPILOT_SECRET_KEY in .env}
     depends_on:
       postgres:
         condition: service_healthy

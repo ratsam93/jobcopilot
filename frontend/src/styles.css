@@ -680,7 +680,7 @@ label {
   line-height: 1.5;
 }
 
-/* Simulated Email Composer */
+/* Email Composer */
 .email-composer {
   background: var(--bg-card);
   border: 1px solid var(--border-medium);

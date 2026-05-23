@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ApiError, api, clearToken, getToken, isDemoMode, setDemoMode, setToken } from './api'
+import { ApiError, api, clearToken, getToken, setToken } from './api'
 
 type ActivityEvent = {
   timestamp: string
@@ -61,14 +61,6 @@ const workflowSteps = [
   'Gmail Draft',
 ]
 
-const defaultResume = `Sam Patel
-AI Consultant
-
-AI automation, FastAPI, SQL, Postgres, Docker, AWS, LLMs
-
-- Built AI automation workflows for consulting clients.
-- Led backend APIs using FastAPI and SQL.`
-
 const defaultPrompt =
   'Apply to top technology companies across the USA where I am fit. Prepare resume, cover letter, find hiring manager and recruiter, but do not send anything without my approval.'
 
@@ -105,8 +97,8 @@ export default function App() {
 
   // Profile states
   const [resumeFile, setResumeFile] = useState<File | null>(null)
-  const [resumeText, setResumeText] = useState(defaultResume)
-  const [resumeFileName, setResumeFileName] = useState('sample_resume_ai_consultant.txt')
+  const [resumeText, setResumeText] = useState('')
+  const [resumeFileName, setResumeFileName] = useState('resume.txt')
   const [resumeState, setResumeState] = useState<ResumeState | null>(null)
 
   // Campaign & Stepper states
@@ -130,7 +122,7 @@ export default function App() {
   const [lastResponse, setLastResponse] = useState<unknown>(null)
   const [lastError, setLastError] = useState<string>('')
   
-  // Interactive Local UI Editors (Simulated visual email and cover letter tweaks)
+  // Interactive local UI editors for generated artifacts
   const [editedCoverLetter, setEditedCoverLetter] = useState('')
   const [editedEmailBody, setEditedEmailBody] = useState('')
   const [editedEmailSubject, setEditedEmailSubject] = useState('')
@@ -192,7 +184,6 @@ export default function App() {
 
   const clearSession = () => {
     clearToken()
-    setDemoMode(false)
     sessionStorage.removeItem(STORAGE.email)
     sessionStorage.removeItem(STORAGE.profileId)
     sessionStorage.removeItem(STORAGE.campaignId)
@@ -317,43 +308,17 @@ export default function App() {
   const handleLogin = async () => {
     setLoginBusy(true)
     try {
-      setDemoMode(false)
       const response = await apiCall('login', '/api/auth/login', () => api.login(email, password), { email }, 'auth')
       setToken(response.access_token)
       setTokenState(response.access_token)
       sessionStorage.setItem(STORAGE.email, response.user.email)
       setEmail(response.user.email)
-      setDemoMode(Boolean(response.demo_mode))
       await loadSnapshot()
     } catch {
       // handled by apiCall
     } finally {
       setLoginBusy(false)
     }
-  }
-
-  const handleDemoLogin = async () => {
-    setDemoMode(true)
-    const demoEmail = email || 'admin@jobcopilot.local'
-    const response = await api.login(demoEmail, password)
-    setToken(response.access_token)
-    setTokenState(response.access_token)
-    sessionStorage.setItem(STORAGE.email, response.user.email)
-    setEmail(response.user.email)
-    setBackendStatus('demo')
-    setDatabaseStatus('demo')
-    setLastError('')
-    addActivity(
-      eventMessage({
-        action: 'demo_login',
-        endpoint: 'local-demo-session',
-        status: 'ok',
-        entity_id: response.user.id,
-        message: `Demo mode started for ${response.user.email}`,
-        response,
-      }),
-    )
-    await loadSnapshot()
   }
 
   const handleLogout = () => {
@@ -375,12 +340,6 @@ export default function App() {
   }
 
   const handleUploadResumeFile = async () => {
-    if (isDemoMode()) {
-      const message = 'Real resume upload is disabled in Demo Mode. Log out, sign in with the live backend, then upload again.'
-      setLastError(message)
-      addActivity(eventMessage({ action: 'upload_resume', endpoint: '/api/career-vault/resume/upload', status: 'blocked', entity_id: '', message }))
-      return
-    }
     if (!resumeFile) {
       const message = 'Choose a PDF, DOCX, or TXT file before clicking Process Document.'
       setLastError(message)
@@ -405,8 +364,8 @@ export default function App() {
   }
 
   const handleSavePastedResume = async () => {
-    if (isDemoMode()) {
-      const message = 'Real resume parsing is disabled in Demo Mode. Log out, sign in with the live backend, then save pasted text again.'
+    if (!resumeText.trim()) {
+      const message = 'Paste resume text before saving.'
       setLastError(message)
       addActivity(eventMessage({ action: 'save_pasted_resume', endpoint: '/api/career-vault/resume/upload', status: 'blocked', entity_id: '', message }))
       return
@@ -731,7 +690,7 @@ export default function App() {
               <div className="user-avatar">{email.charAt(0).toUpperCase()}</div>
               <div className="user-info">
                 <span className="user-email">{email}</span>
-                <span className="user-role">{isDemoMode() ? 'Demo Mode' : 'Standard User'}</span>
+                <span className="user-role">Production User</span>
               </div>
             </div>
           ) : (
@@ -809,12 +768,6 @@ export default function App() {
                 <button onClick={handleLogin} disabled={loginBusy} style={{ width: '100%', marginTop: '8px' }}>
                   {loginBusy ? 'Authenticating...' : 'Sign In'}
                 </button>
-                <button className="secondary" onClick={handleDemoLogin} disabled={loginBusy} style={{ width: '100%' }}>
-                  Use Demo Mode
-                </button>
-                <p className="meta" style={{ margin: 0 }}>
-                  If the backend is unavailable, demo mode keeps the workflow console usable without pretending data was sent to production.
-                </p>
               </div>
             </div>
           )}
@@ -925,17 +878,6 @@ export default function App() {
                       <h2>Resume Intake Center</h2>
                     </div>
                     <p className="card-description">Upload your existing document or paste raw text to feed the Career Vault kernel.</p>
-                    {isDemoMode() && (
-                      <div className="claims-alert-box" style={{ marginBottom: '16px', background: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.35)' }}>
-                        <div className="claims-title" style={{ color: 'var(--warning)' }}>
-                          Demo Mode Active
-                        </div>
-                        <p className="meta" style={{ margin: 0 }}>
-                          This screen is showing sample data only. Log out and sign in with the live backend before uploading a real resume.
-                        </p>
-                      </div>
-                    )}
-                    
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       <div style={{ border: '2px dashed var(--border-medium)', borderRadius: '12px', padding: '24px', textAlign: 'center', background: 'rgba(255,255,255,0.01)' }}>
                         <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke="var(--text-muted)" style={{ width: '40px', height: '40px', margin: '0 auto 12px auto' }}>
@@ -959,8 +901,8 @@ export default function App() {
                           <button className="secondary" onClick={() => document.getElementById('file-upload-input')?.click()}>
                             Browse Files
                           </button>
-                          <button onClick={handleUploadResumeFile} disabled={!resumeFile || isDemoMode()}>
-                            {isDemoMode() ? 'Process Demo Document' : 'Upload and Parse Document'}
+                          <button onClick={handleUploadResumeFile} disabled={!resumeFile}>
+                            Upload and Parse Document
                           </button>
                         </div>
                         {!resumeFile && (
@@ -986,7 +928,7 @@ export default function App() {
                             placeholder="Paste text contents here..."
                           />
                         </label>
-                        <button onClick={handleSavePastedResume} disabled={isDemoMode()} style={{ marginTop: '8px' }}>
+                        <button onClick={handleSavePastedResume} disabled={!resumeText.trim()} style={{ marginTop: '8px' }}>
                           Save Pasted Text
                         </button>
                       </div>
@@ -1443,13 +1385,13 @@ export default function App() {
                               
                               {/* Resume Preview Text Document block */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', height: '100%' }}>
-                                <span className="meta">Simulated Resume Document Sheet</span>
+                                <span className="meta">Generated Resume Document</span>
                                 <div className="resume-sheet" style={{ flexGrow: 1 }}>
                                   {visibleArtifact && typeof visibleArtifact.resume_version === 'object' && visibleArtifact.resume_version !== null
                                     ? String((visibleArtifact.resume_version as { resume_text?: string }).resume_text ?? '')
                                     : visibleArtifact?.resume_text 
                                       ? String(visibleArtifact.resume_text)
-                                      : `${activeProfile?.candidate_name ?? 'Candidate Name'}\nTargeting appropriate role...\nSkills aligned accordingly.`
+                                      : 'No tailored resume artifact has been generated yet.'
                                   }
                                 </div>
                               </div>
@@ -1542,7 +1484,7 @@ export default function App() {
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                   <span className="meta">Visual active email Composer</span>
-                                  <span className="email-verification-badge verified">Verified Candidate Email ✓</span>
+                                  <span className="email-verification-badge verified">Email verification required</span>
                                 </div>
                                 
                                 <div className="button-row" style={{ marginTop: 0 }}>
@@ -1576,7 +1518,7 @@ export default function App() {
                                       className="composer-value-input"
                                       value={editedEmailTo} 
                                       onChange={(e) => setEditedEmailTo(e.target.value)} 
-                                      placeholder="hiring.manager@target.com"
+                                      placeholder="recipient email"
                                     />
                                   </div>
                                   <div className="composer-row" style={{ borderTop: '1px solid var(--border-light)', paddingTop: '8px' }}>
@@ -1594,7 +1536,7 @@ export default function App() {
                                     className="composer-textarea"
                                     value={editedEmailBody}
                                     onChange={(e) => setEditedEmailBody(e.target.value)}
-                                    placeholder="Simulated email editor text..."
+                                    placeholder="Generated outreach email content will appear here."
                                   />
                                 </div>
                               </div>
@@ -1641,7 +1583,7 @@ export default function App() {
                             <tr key={index}>
                               <td>
                                 <strong style={{ color: '#fff' }}>
-                                  {String(gmail?.to ?? item.person_id ?? 'jane.doe@example.com')}
+                                  {String(gmail?.to ?? item.person_id ?? 'No recipient selected')}
                                 </strong>
                               </td>
                               <td>{String(item.draft_type ?? 'hiring_manager_email').replace(/_/g, ' ')}</td>

@@ -8,7 +8,6 @@ from apps.backend.app.core_kernel.workflow_state import WorkflowStatus
 from apps.backend.app.modules.campaign_planner.service import store as campaign_store
 from apps.backend.app.modules.career_vault.service import store as career_store
 from apps.backend.app.modules.document_generator.service import DocumentGeneratorService
-from apps.backend.app.modules.email_discovery.service import EmailDiscoveryService
 from apps.backend.app.modules.fit_scoring.service import FitScoringService
 from apps.backend.app.modules.job_discovery.service import Job, JobDiscoveryService
 from apps.backend.app.modules.outreach_generator.service import OutreachGeneratorService
@@ -184,7 +183,6 @@ def generate_outreach(campaign_id: str, workflow_run_id: str | None = None) -> d
                 scorer = FitScoringService()
                 package_service = DocumentGeneratorService()
                 people_service = PeopleFinderService()
-                email_service = EmailDiscoveryService()
                 outreach_service = OutreachGeneratorService()
                 review_service = ReviewQueueService()
                 normalized = JobDiscoveryService.normalize(
@@ -200,36 +198,29 @@ def generate_outreach(campaign_id: str, workflow_run_id: str | None = None) -> d
                 score = scorer.score(normalized, profile)
                 package = package_service.generate_package(normalized, profile, score)
                 people = people_service.find_people(package)
-                candidate = email_service.generate_candidates(
-                    PersonCandidate(
-                        person_id=people[0].person_id,
-                        company=people[0].company,
-                        name=people[0].name,
-                        title=people[0].title,
-                        person_type=people[0].person_type,
-                        source_url=people[0].source_url,
-                        source_type=people[0].source_type,
-                        email="jane.doe@example.com",
-                        email_verification_status="verified",
-                        confidence=people[0].confidence,
-                        why_relevant=people[0].why_relevant,
-                    ),
-                    "example.com",
-                )[0]
+                verified_person = next((person for person in people if person.email and person.email_verification_status == "verified"), None)
+                if verified_person is None:
+                    result = {
+                        "campaign_id": campaign_id,
+                        "drafts_created": 0,
+                        "reason": "No verified recipient email is available for outreach generation",
+                    }
+                    workflow_runs.mark_succeeded(run_id, result)
+                    return result
                 draft = outreach_service.generate(
                     package,
                     PersonCandidate(
-                        person_id=candidate.person_id,
-                        company=people[0].company,
-                        name=people[0].name,
-                        title=people[0].title,
-                        person_type=people[0].person_type,
-                        source_url=people[0].source_url,
-                        source_type=people[0].source_type,
-                        email=candidate.email,
-                        email_verification_status=candidate.verification_status,
-                        confidence=people[0].confidence,
-                        why_relevant=people[0].why_relevant,
+                        person_id=verified_person.person_id,
+                        company=verified_person.company,
+                        name=verified_person.name,
+                        title=verified_person.title,
+                        person_type=verified_person.person_type,
+                        source_url=verified_person.source_url,
+                        source_type=verified_person.source_type,
+                        email=verified_person.email,
+                        email_verification_status=verified_person.email_verification_status,
+                        confidence=verified_person.confidence,
+                        why_relevant=verified_person.why_relevant,
                     ),
                 )
                 review_service.create_review("system", "outreach_draft", draft.outreach_draft_id, "2026-05-23T00:00:00Z")
