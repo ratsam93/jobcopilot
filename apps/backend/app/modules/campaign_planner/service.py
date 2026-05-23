@@ -5,6 +5,8 @@ from uuid import UUID, uuid4
 
 from fastapi import HTTPException
 
+from apps.backend.app.repositories import CampaignRepository
+
 from .models import (
     Campaign,
     CampaignConstraint,
@@ -21,10 +23,11 @@ from ..career_vault.service import utc_now
 
 class CampaignPlannerStore:
     def __init__(self) -> None:
-        self.campaigns: dict[UUID, Campaign] = {}
-        self.constraints: dict[UUID, list[CampaignConstraint]] = {}
-        self.runs: dict[UUID, list[CampaignRun]] = {}
-        self.jobs: dict[UUID, list[JobSummary]] = {}
+        self.repo = CampaignRepository()
+
+    def _persist(self, campaign: Campaign) -> Campaign:
+        self.repo.upsert(campaign)
+        return campaign
 
     def _build_campaign_name(self, prompt: str) -> str:
         prompt = prompt.strip().rstrip(".")
@@ -83,9 +86,7 @@ class CampaignPlannerStore:
             structured_query=structured_query,
             execution_mode=payload.execution_mode or "approval_required",
         )
-        self.campaigns[campaign.campaign_id] = campaign
-        self.runs[campaign.campaign_id] = []
-        self.jobs[campaign.campaign_id] = []
+        campaign = self._persist(campaign)
         return campaign
 
     def parse_campaign(self, campaign_id: UUID, payload: CampaignParseInput) -> Campaign:
@@ -94,10 +95,11 @@ class CampaignPlannerStore:
         campaign.structured_query = self._validate_query(self._infer_query(prompt, campaign.candidate_profile_id))
         campaign.campaign_name = self._build_campaign_name(prompt)
         campaign.status = "parsed"
-        return campaign
+        campaign.updated_at = utc_now()
+        return self._persist(campaign)
 
     def get_campaign(self, campaign_id: UUID) -> Campaign:
-        campaign = self.campaigns.get(campaign_id)
+        campaign = self.repo.get(campaign_id)
         if campaign is None:
             raise HTTPException(status_code=404, detail="Campaign not found")
         return campaign
@@ -105,52 +107,56 @@ class CampaignPlannerStore:
     def start_run(self, campaign_id: UUID) -> CampaignRun:
         campaign = self.get_campaign(campaign_id)
         run = CampaignRun(campaign_id=campaign_id, status="running", started_at=utc_now())
-        self.runs[campaign_id].append(run)
+        campaign.runs.append(run)
         campaign.status = "running"
         campaign.updated_at = utc_now()
-        self.jobs[campaign_id] = [
+        campaign.jobs = [
             JobSummary(job_id=uuid4(), campaign_id=campaign_id, title="Queued job 1", company_name="Example AI", status="queued"),
             JobSummary(job_id=uuid4(), campaign_id=campaign_id, title="Queued job 2", company_name="Northstar Labs", status="queued"),
         ]
+        self._persist(campaign)
         return run
 
     def pause(self, campaign_id: UUID) -> Campaign:
         campaign = self.get_campaign(campaign_id)
         campaign.status = "paused"
         campaign.updated_at = utc_now()
-        return campaign
+        return self._persist(campaign)
 
     def cancel(self, campaign_id: UUID) -> Campaign:
         campaign = self.get_campaign(campaign_id)
         campaign.status = "cancelled"
         campaign.updated_at = utc_now()
-        return campaign
+        return self._persist(campaign)
 
     def status(self, campaign_id: UUID) -> dict[str, object]:
         campaign = self.get_campaign(campaign_id)
+        runs = getattr(campaign, "runs", [])
+        jobs = getattr(campaign, "jobs", [])
         return {
             "campaign_id": campaign.campaign_id,
             "status": campaign.status,
             "execution_mode": campaign.execution_mode,
-            "latest_run": self.runs[campaign_id][-1].model_dump() if self.runs[campaign_id] else None,
-            "job_count": len(self.jobs.get(campaign_id, [])),
+            "latest_run": runs[-1].model_dump() if runs else None,
+            "job_count": len(jobs),
             "campaign_name": campaign.campaign_name,
             "structured_query": campaign.structured_query.model_dump(),
         }
 
     def list_jobs(self, campaign_id: UUID) -> list[dict[str, object]]:
-        self.get_campaign(campaign_id)
-        return [job.model_dump() for job in self.jobs.get(campaign_id, [])]
+        campaign = self.get_campaign(campaign_id)
+        return [job.model_dump() for job in getattr(campaign, "jobs", [])]
 
     def add_constraint(self, campaign_id: UUID, constraint_type: str, constraint_value: str, mandatory: bool = True) -> CampaignConstraint:
-        self.get_campaign(campaign_id)
+        campaign = self.get_campaign(campaign_id)
         constraint = CampaignConstraint(
             campaign_id=campaign_id,
             constraint_type=constraint_type,
             constraint_value=constraint_value,
             mandatory=mandatory,
         )
-        self.constraints.setdefault(campaign_id, []).append(constraint)
+        campaign.constraints.append(constraint)
+        self._persist(campaign)
         return constraint
 
 

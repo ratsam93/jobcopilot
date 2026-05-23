@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import re
-from collections import defaultdict
 from pathlib import Path
-from typing import Iterable
 from uuid import UUID
 
 from fastapi import HTTPException
+
+from apps.backend.app.repositories import CareerProfileRepository
 
 from .models import (
     Bullet,
@@ -45,24 +45,31 @@ SKILL_KEYWORDS = [
 
 class CareerVaultStore:
     def __init__(self) -> None:
-        self.profiles: dict[UUID, CareerProfile] = {}
-        self.upload_index: dict[tuple[str, str], UUID] = {}
-        self._version_counter = defaultdict(int)
+        self.repo = CareerProfileRepository()
 
-    def _next_version(self, candidate_profile_id: UUID) -> int:
-        self._version_counter[candidate_profile_id] += 1
-        return self._version_counter[candidate_profile_id]
+    def _persist_profile(self, profile: CareerProfile, upload_key: str | None = None) -> None:
+        key = upload_key
+        if key is None:
+            source = profile.source_resumes[0] if profile.source_resumes else None
+            filename = source.filename if source else "resume.txt"
+            text = source.text if source else ""
+            key = self._upload_key(filename, text)
+        self.repo.upsert(profile, key)
 
     def _detect_duplicate(self, filename: str, text: str) -> UUID | None:
-        key = (filename.lower(), re.sub(r"\s+", " ", text.strip()).lower())
-        return self.upload_index.get(key)
+        key = self._upload_key(filename, text)
+        profile = self.repo.find_by_upload_key(key)
+        return profile.candidate_profile_id if profile else None
 
     def _remember_upload(self, filename: str, text: str, profile_id: UUID) -> None:
-        key = (filename.lower(), re.sub(r"\s+", " ", text.strip()).lower())
-        self.upload_index[key] = profile_id
+        profile = self.get_profile(profile_id)
+        self._persist_profile(profile, self._upload_key(filename, text))
+
+    def _upload_key(self, filename: str, text: str) -> str:
+        return f"{filename.lower()}::{re.sub(r'\\s+', ' ', text.strip()).lower()}"
 
     def get_profile(self, candidate_profile_id: UUID) -> CareerProfile:
-        profile = self.profiles.get(candidate_profile_id)
+        profile = self.repo.get(candidate_profile_id)
         if profile is None:
             raise HTTPException(status_code=404, detail="Candidate profile not found")
         return profile
@@ -74,6 +81,7 @@ class CareerVaultStore:
             setattr(profile, key, value)
         profile.version += 1
         profile.updated_at = utc_now()
+        self._persist_profile(profile)
         return profile
 
     def add_skill(self, candidate_profile_id: UUID, payload: SkillInput) -> Skill:
@@ -87,6 +95,7 @@ class CareerVaultStore:
         skill = Skill(candidate_profile_id=candidate_profile_id, **payload.model_dump())
         profile.skills.append(skill)
         profile.updated_at = utc_now()
+        self._persist_profile(profile)
         return skill
 
     def add_claim(self, candidate_profile_id: UUID, payload: ClaimInput) -> Claim:
@@ -98,6 +107,7 @@ class CareerVaultStore:
         claim = Claim(candidate_profile_id=candidate_profile_id, **payload.model_dump())
         profile.approved_claims.append(claim)
         profile.updated_at = utc_now()
+        self._persist_profile(profile)
         return claim
 
     def add_do_not_claim(self, candidate_profile_id: UUID, payload: DoNotClaimInput) -> DoNotClaim:
@@ -109,6 +119,7 @@ class CareerVaultStore:
         entry = DoNotClaim(candidate_profile_id=candidate_profile_id, **payload.model_dump())
         profile.do_not_claim.append(entry)
         profile.updated_at = utc_now()
+        self._persist_profile(profile)
         return entry
 
     def add_bullet(self, candidate_profile_id: UUID, payload: BulletInput) -> Bullet:
@@ -116,6 +127,7 @@ class CareerVaultStore:
         bullet = Bullet(candidate_profile_id=candidate_profile_id, **payload.model_dump())
         profile.bullet_bank.append(bullet)
         profile.updated_at = utc_now()
+        self._persist_profile(profile)
         return bullet
 
     def parse_resume_text(self, text: str, filename: str = "resume.txt") -> ResumeUploadResult:
@@ -132,6 +144,7 @@ class CareerVaultStore:
             ):
                 profile.source_resumes.append(resume)
                 profile.updated_at = utc_now()
+                self._persist_profile(profile, self._upload_key(filename, text))
             return ResumeUploadResult(
                 candidate_profile_id=profile.candidate_profile_id,
                 parse_status="parsed",
@@ -163,8 +176,7 @@ class CareerVaultStore:
             Claim(candidate_profile_id=profile.candidate_profile_id, claim_text=claim)
             for claim in self._extract_claims(text)
         ]
-        self.profiles[profile.candidate_profile_id] = profile
-        self._remember_upload(filename, text, profile.candidate_profile_id)
+        self._persist_profile(profile, self._upload_key(filename, text))
         return ResumeUploadResult(
             candidate_profile_id=profile.candidate_profile_id,
             parse_status="parsed",

@@ -51,6 +51,9 @@ class ParsedCampaign(BaseModel):
 
 
 class Campaign(ParsedCampaign):
+    constraints: list["CampaignConstraint"] = Field(default_factory=list)
+    runs: list["CampaignRun"] = Field(default_factory=list)
+    jobs: list["JobSummary"] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -84,4 +87,3 @@ class JobSummary(BaseModel):
 
 class CampaignParseInput(BaseModel):
     natural_language_prompt: str | None = None
-

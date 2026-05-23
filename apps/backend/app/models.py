@@ -33,3 +33,22 @@ class WorkflowRunRow(Base):
     status: Mapped[str] = mapped_column(String(50), index=True)
     details_json: Mapped[dict[str, Any]] = mapped_column(_json_type())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class CareerProfileRow(Base):
+    __tablename__ = "career_profiles"
+
+    candidate_profile_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    upload_key: Mapped[str] = mapped_column(String(512), index=True)
+    profile_json: Mapped[dict[str, Any]] = mapped_column(_json_type())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class CampaignRow(Base):
+    __tablename__ = "campaigns"
+
+    campaign_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    campaign_json: Mapped[dict[str, Any]] = mapped_column(_json_type())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
