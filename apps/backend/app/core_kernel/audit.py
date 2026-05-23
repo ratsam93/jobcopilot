@@ -7,6 +7,8 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
+from apps.backend.app.persistence_repos import AuditLogRepository
+
 
 class AuditActorType(str, Enum):
     user = "user"
@@ -59,10 +61,10 @@ class AuditEvent(BaseModel):
 
 class AuditLogStore:
     def __init__(self) -> None:
-        self._entries: list[AuditLogEntry] = []
+        self.repo = AuditLogRepository()
 
     def append(self, entry: AuditLogEntry) -> AuditLogEntry:
-        self._entries.append(entry)
+        self.repo.append(entry.model_dump(mode="json"))
         return entry
 
     def append_event(self, event: AuditEvent) -> AuditLogEntry:
@@ -89,4 +91,4 @@ class AuditLogStore:
         return self.append(entry)
 
     def list(self) -> list[AuditLogEntry]:
-        return list(self._entries)
+        return [AuditLogEntry.model_validate(item) for item in self.repo.list()]

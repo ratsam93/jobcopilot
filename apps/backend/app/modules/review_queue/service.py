@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from apps.backend.app.modules.outreach_generator.service import OutreachDraft
+from apps.backend.app.persistence_repos import ReviewItemRepository
+from apps.backend.app.shared.contracts import ReviewQueueItem
 
 
 @dataclass(frozen=True)
@@ -26,7 +28,7 @@ class ReviewDecision:
 
 class ReviewQueueService:
     def __init__(self) -> None:
-        self.reviews: dict[str, ReviewItem] = {}
+        self.repo = ReviewItemRepository()
 
     def create_review(self, user_id: str, entity_type: str, entity_id: str, requested_at: str) -> ReviewItem:
         review = ReviewItem(
@@ -37,7 +39,8 @@ class ReviewQueueService:
             status="pending_review",
             requested_at=requested_at,
         )
-        self.reviews[review.review_id] = review
+        ReviewQueueItem.model_validate(asdict(review))
+        self.repo.upsert(review.review_id, asdict(review))
         return review
 
     def approve(self, review: ReviewItem) -> ReviewDecision:

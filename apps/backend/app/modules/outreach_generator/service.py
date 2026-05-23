@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 from apps.backend.app.modules.document_generator.service import ApplicationPackage
 from apps.backend.app.modules.people_finder.service import PersonCandidate
+from apps.backend.app.persistence_repos import OutreachDraftRepository
+from apps.backend.app.shared.contracts import OutreachEmailResult
 
 
 @dataclass(frozen=True)
@@ -22,7 +24,7 @@ class OutreachDraft:
 
 class OutreachGeneratorService:
     def __init__(self) -> None:
-        self.drafts: dict[str, OutreachDraft] = {}
+        self.repo = OutreachDraftRepository()
 
     def generate(self, package: ApplicationPackage, person: PersonCandidate) -> OutreachDraft:
         if person.do_not_contact:
@@ -52,8 +54,12 @@ class OutreachGeneratorService:
                 "body": body,
             },
         )
-        self.drafts[draft.outreach_draft_id] = draft
+        OutreachEmailResult.model_validate(asdict(draft))
+        self.repo.upsert(draft.outreach_draft_id, asdict(draft))
         return draft
 
     def get(self, outreach_draft_id: str) -> OutreachDraft:
-        return self.drafts[outreach_draft_id]
+        payload = self.repo.get(outreach_draft_id)
+        if payload is None:
+            raise KeyError(outreach_draft_id)
+        return OutreachDraft(**payload)

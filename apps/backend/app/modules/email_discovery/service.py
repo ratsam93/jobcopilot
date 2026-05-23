@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from apps.backend.app.modules.people_finder.service import EmailCandidate, PersonCandidate
+from apps.backend.app.persistence_repos import EmailCandidateRepository
 
 
 @dataclass(frozen=True)
@@ -23,7 +24,7 @@ class EmailVerificationAdapter:
 class EmailDiscoveryService:
     def __init__(self, verifier: EmailVerificationAdapter | None = None) -> None:
         self.verifier = verifier or EmailVerificationAdapter()
-        self.candidates: dict[str, list[EmailCandidate]] = {}
+        self.repo = EmailCandidateRepository()
 
     def generate_candidates(self, person: PersonCandidate, domain: str) -> list[EmailCandidate]:
         local_parts = [
@@ -47,9 +48,10 @@ class EmailDiscoveryService:
                 )
             )
         ranked = sorted(candidates, key=lambda item: item.verification_score, reverse=True)
-        self.candidates[person.person_id] = ranked
+        for candidate in ranked:
+            self.repo.upsert(candidate.email_candidate_id, asdict(candidate))
         return ranked
 
     def best_candidate(self, person_id: str) -> EmailCandidate | None:
-        candidates = self.candidates.get(person_id, [])
+        candidates = [EmailCandidate(**item) for item in self.repo.list_all() if item["person_id"] == person_id]
         return candidates[0] if candidates else None

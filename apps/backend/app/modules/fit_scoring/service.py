@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 from apps.backend.app.modules.job_discovery.service import NormalizedJob
+from apps.backend.app.persistence_repos import JobScoreRepository
+from apps.backend.app.shared.contracts import FitScoreResult
 
 
 @dataclass(frozen=True)
@@ -39,7 +41,7 @@ class JobScore:
 
 class FitScoringService:
     def __init__(self) -> None:
-        self.scores: dict[str, JobScore] = {}
+        self.repo = JobScoreRepository()
 
     def score(self, job: NormalizedJob, profile: CandidateProfile) -> JobScore:
         role_match = self._score_role_match(job, profile)
@@ -76,11 +78,15 @@ class FitScoringService:
             explanation=explanation,
             confidence=confidence,
         )
-        self.scores[result.job_score_id] = result
+        FitScoreResult.model_validate(asdict(result))
+        self.repo.upsert(result.job_score_id, asdict(result))
         return result
 
     def get(self, job_score_id: str) -> JobScore:
-        return self.scores[job_score_id]
+        payload = self.repo.get(job_score_id)
+        if payload is None:
+            raise KeyError(job_score_id)
+        return JobScore(**payload)
 
     def _role_terms(self, profile: CandidateProfile) -> list[str]:
         return [role.lower() for role in profile.target_roles]

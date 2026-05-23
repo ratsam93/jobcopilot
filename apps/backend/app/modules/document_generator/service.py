@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 from apps.backend.app.modules.fit_scoring.service import CandidateProfile, JobScore
 from apps.backend.app.modules.job_discovery.service import NormalizedJob
+from apps.backend.app.persistence_repos import ApplicationPackageRepository
+from apps.backend.app.shared.contracts import ResumeTailoringResult, CoverLetterResult
 
 
 @dataclass(frozen=True)
@@ -30,7 +32,7 @@ class ApplicationPackage:
 
 class DocumentGeneratorService:
     def __init__(self) -> None:
-        self.packages: dict[str, ApplicationPackage] = {}
+        self.repo = ApplicationPackageRepository()
 
     def generate_package(self, job: NormalizedJob, profile: CandidateProfile, score: JobScore) -> ApplicationPackage:
         unsupported = [claim for claim in job.required_skills if claim.lower() in {item.lower() for item in profile.do_not_claim}]
@@ -68,11 +70,25 @@ class DocumentGeneratorService:
             resume_version=resume_version,
             cover_letter=self._cover_letter(job, profile, score),
         )
-        self.packages[package.application_package_id] = package
+        ResumeTailoringResult.model_validate(asdict(package))
+        CoverLetterResult.model_validate(
+            {
+                "subject": f"Application for {job.title}",
+                "body": package.cover_letter,
+                "personalization_points": package.fit_summary[:2],
+            }
+        )
+        self.repo.upsert(package.application_package_id, asdict(package))
         return package
 
     def get(self, application_package_id: str) -> ApplicationPackage:
-        return self.packages[application_package_id]
+        payload = self.repo.get(application_package_id)
+        if payload is None:
+            raise KeyError(application_package_id)
+        resume_version_payload = payload.get("resume_version")
+        if isinstance(resume_version_payload, dict):
+            payload = {**payload, "resume_version": ResumeVersion(**resume_version_payload)}
+        return ApplicationPackage(**payload)
 
     def _fit_summary(self, job: NormalizedJob, profile: CandidateProfile, score: JobScore) -> list[str]:
         base = [f"Target role match for {job.title} at {job.company}."]

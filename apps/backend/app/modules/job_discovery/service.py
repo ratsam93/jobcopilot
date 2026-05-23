@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from hashlib import sha256
 from typing import Protocol
 from urllib.parse import urlparse
+
+from apps.backend.app.persistence_repos import JobRecordRepository
+from apps.backend.app.shared.contracts import JobParseResult
 
 
 @dataclass(frozen=True)
@@ -51,21 +54,38 @@ class JobRecord:
 
 class JobDiscoveryStore:
     def __init__(self) -> None:
-        self.records: dict[str, JobRecord] = {}
+        self.repo = JobRecordRepository()
 
     def persist(self, jobs: list[NormalizedJob], discovery_batch_id: str = "batch-1", persisted_at: str = "2026-05-21T00:00:00Z") -> list[JobRecord]:
         persisted: list[JobRecord] = []
         for job in jobs:
             record = JobRecord(normalized_job=job, persisted_at=persisted_at, discovery_batch_id=discovery_batch_id)
-            self.records[job.job_id] = record
+            self.repo.upsert(
+                job.job_id,
+                {
+                    "normalized_job_json": asdict(job),
+                    "persisted_at": persisted_at,
+                    "discovery_batch_id": discovery_batch_id,
+                },
+                persisted_at=persisted_at,
+                discovery_batch_id=discovery_batch_id,
+            )
+            JobParseResult.model_validate(asdict(job))
             persisted.append(record)
         return persisted
 
     def list(self) -> list[NormalizedJob]:
-        return [record.normalized_job for record in self.records.values()]
+        return [NormalizedJob(**item["normalized_job_json"]) for item in self.repo.list_all()]
 
     def get(self, job_id: str) -> JobRecord:
-        return self.records[job_id]
+        payload = self.repo.get(job_id)
+        if payload is None:
+            raise KeyError(job_id)
+        return JobRecord(
+            normalized_job=NormalizedJob(**payload["normalized_job_json"]),
+            persisted_at=payload["persisted_at"],
+            discovery_batch_id=payload["discovery_batch_id"],
+        )
 
 
 class JobDiscoveryService:

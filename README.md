@@ -4,12 +4,13 @@ Production-oriented job search and campaign workflow stack with a separate React
 
 ## Repository layout
 
-- `apps/backend/` - FastAPI API, workflow services, database bootstrap, worker entrypoint
+- `apps/backend/` - FastAPI API, Celery task modules, database bootstrap, worker entrypoint
 - `frontend/` - React + Vite UI
 - `docker-compose.yml` - production/local compose stack
 - `requirements.txt` - runtime Python dependencies for the backend
 - `requirements-dev.txt` - runtime dependencies plus test tooling
 - `.env.example` - environment template for the server
+- `alembic/` and `alembic.ini` - database migrations
 - `tests/` - integration, end-to-end, and unit coverage
 - `docs/` - SRS and planning documents
 - `research/oss-reference/` - cloned OSS reference repos only
@@ -26,6 +27,13 @@ For local development and tests:
 
 ```bash
 python -m pip install -r requirements-dev.txt
+```
+
+Alembic commands:
+
+```bash
+alembic revision --autogenerate -m "message"
+alembic upgrade head
 ```
 
 ## Run with Docker Compose
@@ -48,6 +56,8 @@ Check status and logs:
 docker compose ps
 docker compose logs -f
 ```
+
+The `worker` service runs the Celery worker process backed by Redis.
 
 Stop the stack:
 
@@ -104,3 +114,4 @@ Required secrets:
 - The backend currently persists the initial schema and health checks; domain services are still being migrated from in-memory stores.
 - OSS reference clones stay under `research/oss-reference/` and are not part of the production runtime.
 - The old root-level single-container `Dockerfile` has been removed. Use `apps/backend/Dockerfile` and `frontend/Dockerfile` through Compose.
+- Compose runs database migrations before backend startup through the backend container command.

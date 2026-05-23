@@ -9,13 +9,17 @@ from fastapi.responses import FileResponse
 from apps.backend.app.database import check_database
 from apps.backend.app.config import settings
 from apps.backend.app.db_init import initialize_database
+from apps.backend.app.auth import auth_service
+from apps.backend.app.modules.auth.api import router as auth_router
 from apps.backend.app.modules.campaign_planner.api import router as campaign_router
 from apps.backend.app.modules.career_vault.api import router as career_vault_router
+from apps.backend.app.modules.outreach_generator.api import router as outreach_router
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     initialize_database()
+    auth_service.create_demo_user_if_missing()
     yield
 
 
@@ -32,6 +36,8 @@ app.add_middleware(
 
 app.include_router(career_vault_router, prefix="/api")
 app.include_router(campaign_router, prefix="/api")
+app.include_router(outreach_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
 
 if frontend_dist.exists():
     app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")

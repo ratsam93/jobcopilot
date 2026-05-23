@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from apps.backend.app.modules.document_generator.service import ApplicationPackage
+from apps.backend.app.persistence_repos import PeopleCacheRepository
 
 
 @dataclass(frozen=True)
@@ -35,7 +36,7 @@ class EmailCandidate:
 
 class PeopleFinderService:
     def __init__(self) -> None:
-        self._cache: dict[str, list[PersonCandidate]] = {}
+        self.repo = PeopleCacheRepository()
 
     def find_people(self, package: ApplicationPackage) -> list[PersonCandidate]:
         if package.status != "review_pending":
@@ -69,8 +70,11 @@ class PeopleFinderService:
             ),
         ]
         ranked = sorted(people, key=lambda item: item.confidence, reverse=True)
-        self._cache[package.application_package_id] = ranked
+        self.repo.upsert(package.application_package_id, {"people": [asdict(person) for person in ranked]})
         return ranked
 
     def get_cached(self, application_package_id: str) -> list[PersonCandidate]:
-        return self._cache.get(application_package_id, [])
+        payload = self.repo.get(application_package_id)
+        if payload is None:
+            return []
+        return [PersonCandidate(**item) for item in payload["people"]]

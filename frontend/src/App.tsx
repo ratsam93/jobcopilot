@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api } from './api'
+import { api, clearToken, getToken, setToken } from './api'
 
 type LogLine = { kind: 'info' | 'error'; message: string }
 
@@ -49,6 +49,9 @@ const applicationFlow = [
 ]
 
 export default function App() {
+  const [token, setTokenState] = useState<string>(getToken() ?? '')
+  const [email, setEmail] = useState('admin@jobcopilot.local')
+  const [password, setPassword] = useState('admin123')
   const [health, setHealth] = useState<string>('unknown')
   const [resumeText, setResumeText] = useState<string>(
     'Sam Patel\nAI Consultant\n\nAI automation, FastAPI, SQL, Postgres, Docker, AWS, LLMs\n\n- Built AI automation workflows for consulting clients.\n- Led backend APIs using FastAPI and SQL.\n',
@@ -59,6 +62,7 @@ export default function App() {
   const [campaignId, setCampaignId] = useState<string>('')
   const [campaignStatus, setCampaignStatus] = useState<Record<string, unknown> | null>(null)
   const [campaignJobs, setCampaignJobs] = useState<Array<Record<string, unknown>>>([])
+  const [outreachDraftId, setOutreachDraftId] = useState('')
   const [logs, setLogs] = useState<LogLine[]>([])
 
   const refreshHealth = async () => {
@@ -73,6 +77,23 @@ export default function App() {
   useEffect(() => {
     void refreshHealth()
   }, [])
+
+  const handleLogin = async () => {
+    try {
+      const result = await api.login(email, password)
+      setToken(result.access_token)
+      setTokenState(result.access_token)
+      pushLog('info', `Logged in as ${result.user.email}`)
+    } catch (error) {
+      pushLog('error', `Login failed: ${String(error)}`)
+    }
+  }
+
+  const handleLogout = () => {
+    clearToken()
+    setTokenState('')
+    pushLog('info', 'Logged out')
+  }
 
   const stats = useMemo(
     () => ({
@@ -136,6 +157,16 @@ export default function App() {
     }
   }
 
+  const handleCreateGmailDraft = async () => {
+    if (!outreachDraftId) return
+    try {
+      const result = await api.createGmailDraft(outreachDraftId)
+      pushLog('info', `Gmail draft created: ${result.gmail_draft_id}`)
+    } catch (error) {
+      pushLog('error', `Gmail draft failed: ${String(error)}`)
+    }
+  }
+
   return (
     <main className="shell">
       <section className="hero">
@@ -155,6 +186,21 @@ export default function App() {
             </button>
             <span className="health">Backend: {health}</span>
           </div>
+          <div className="login-strip">
+            <label>
+              Email
+              <input value={email} onChange={(e) => setEmail(e.target.value)} />
+            </label>
+            <label>
+              Password
+              <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" />
+            </label>
+            <button onClick={handleLogin}>Log in</button>
+            <button className="secondary" onClick={handleLogout} disabled={!token}>
+              Log out
+            </button>
+          </div>
+          <div className="meta">Session token: {token ? 'stored in sessionStorage' : 'not set'}</div>
         </div>
         <div className="hero-card">
           <div className="hero-stat">
@@ -295,6 +341,17 @@ export default function App() {
           <div className="artifact-card">
             <h3>Approval Status</h3>
             <p>Nothing is sent or submitted until the workflow status moves from pending_review to approved.</p>
+          </div>
+          <div className="artifact-card">
+            <h3>Gmail Draft</h3>
+            <p>Create a Gmail draft from an approved outreach message. The system does not send mail automatically.</p>
+            <label>
+              Outreach draft ID
+              <input value={outreachDraftId} onChange={(e) => setOutreachDraftId(e.target.value)} />
+            </label>
+            <button onClick={handleCreateGmailDraft} disabled={!outreachDraftId}>
+              Create Gmail Draft
+            </button>
           </div>
         </article>
       </section>

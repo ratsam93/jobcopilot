@@ -7,10 +7,10 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
-from app.core_kernel.audit import AuditAction, AuditActorType
-from app.core_kernel.permissions import PermissionAction
-from app.core_kernel.registry import ModuleDefinition
-from app.core_kernel.workflow_state import WorkflowStatus, WorkflowType
+from apps.backend.app.core_kernel.audit import AuditAction, AuditActorType
+from apps.backend.app.core_kernel.permissions import PermissionAction
+from apps.backend.app.core_kernel.registry import ModuleDefinition
+from apps.backend.app.core_kernel.workflow_state import WorkflowStatus, WorkflowType
 
 
 class EventType(str, Enum):
@@ -123,3 +123,94 @@ class CoreEventEnvelope(BaseModel):
         | WorkflowEventPayload
         | RegistryEventPayload
     )
+
+
+class ResumeParseResult(BaseModel):
+    candidate_profile_id: UUID
+    parse_status: str
+    source_filename: str
+    extracted_text: str
+    created_profile: dict[str, Any]
+    duplicate_of: UUID | None = None
+
+
+class JobParseResult(BaseModel):
+    job_id: str
+    title: str
+    company: str
+    source: str
+    source_url: str
+    canonical_url: str
+    location: str | None = None
+    remote: bool = False
+    description: str = ""
+    salary_min_usd: int | None = None
+    salary_max_usd: int | None = None
+    required_skills: list[str] = Field(default_factory=list)
+    dedup_key: str
+
+
+class FitScoreResult(BaseModel):
+    job_score_id: str
+    job_id: str
+    candidate_profile_id: str
+    fit_score: int
+    decision: str
+    component_scores: dict[str, int]
+    matched_skills: list[str] = Field(default_factory=list)
+    missing_skills: list[str] = Field(default_factory=list)
+    risk_flags: list[str] = Field(default_factory=list)
+    explanation: str
+    confidence: float
+
+
+class CompanyResearchResult(BaseModel):
+    company_name: str
+    source_url: str
+    summary: str
+    signals: list[str] = Field(default_factory=list)
+    hiring_teams: list[str] = Field(default_factory=list)
+    confidence: float = 0.0
+
+
+class ResumeTailoringResult(BaseModel):
+    application_package_id: str
+    job_id: str
+    candidate_profile_id: str
+    fit_summary: list[str] = Field(default_factory=list)
+    unsupported_claims_detected: list[str] = Field(default_factory=list)
+    risk_flags: list[str] = Field(default_factory=list)
+    status: str
+    resume_version: dict[str, Any]
+    cover_letter: str
+
+
+class CoverLetterResult(BaseModel):
+    subject: str
+    body: str
+    tone: str = "professional"
+    personalization_points: list[str] = Field(default_factory=list)
+
+
+class OutreachEmailResult(BaseModel):
+    outreach_draft_id: str
+    application_package_id: str
+    person_id: str
+    channel: str
+    draft_type: str
+    subject: str
+    body: str
+    personalization_points: list[str] = Field(default_factory=list)
+    status: str
+    gmail_draft: dict[str, str] | None = None
+
+
+class ReviewQueueItem(BaseModel):
+    review_id: str
+    user_id: str
+    entity_type: str
+    entity_id: str
+    status: str
+    requested_at: str
+    reviewed_at: str | None = None
+    review_notes: str | None = None

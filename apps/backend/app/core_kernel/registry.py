@@ -6,6 +6,8 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, model_validator
 
+from apps.backend.app.persistence_repos import ModuleRegistryRepository
+
 
 class ModuleDefinition(BaseModel):
     id: UUID = Field(default_factory=uuid4)
@@ -38,27 +40,34 @@ class ModuleDefinition(BaseModel):
 
 class ModuleRegistry:
     def __init__(self) -> None:
-        self._modules: dict[str, ModuleDefinition] = {}
+        self.repo = ModuleRegistryRepository()
 
     def register(self, module: ModuleDefinition) -> ModuleDefinition:
-        self._modules[module.module_key] = module
+        self.repo.upsert(module.module_key, module.model_dump(mode="json"))
         return module
 
     def get(self, module_key: str) -> ModuleDefinition | None:
-        return self._modules.get(module_key)
+        payload = self.repo.get(module_key)
+        return ModuleDefinition.model_validate(payload) if payload else None
 
     def enable(self, module_key: str) -> ModuleDefinition:
-        module = self._modules[module_key]
-        self._modules[module_key] = module.model_copy(update={"enabled": True})
-        return self._modules[module_key]
+        module = self.get(module_key)
+        if module is None:
+            raise KeyError(module_key)
+        updated = module.model_copy(update={"enabled": True})
+        self.repo.upsert(module_key, updated.model_dump(mode="json"))
+        return updated
 
     def disable(self, module_key: str) -> ModuleDefinition:
-        module = self._modules[module_key]
-        self._modules[module_key] = module.model_copy(update={"enabled": False})
-        return self._modules[module_key]
+        module = self.get(module_key)
+        if module is None:
+            raise KeyError(module_key)
+        updated = module.model_copy(update={"enabled": False})
+        self.repo.upsert(module_key, updated.model_dump(mode="json"))
+        return updated
 
     def list(self) -> list[ModuleDefinition]:
-        return list(self._modules.values())
+        return [ModuleDefinition.model_validate(item) for item in self.repo.list_all()]
 
     def has(self, module_key: str) -> bool:
-        return module_key in self._modules
+        return self.get(module_key) is not None

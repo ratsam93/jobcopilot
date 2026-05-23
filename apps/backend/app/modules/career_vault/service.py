@@ -7,6 +7,7 @@ from uuid import UUID
 from fastapi import HTTPException
 
 from apps.backend.app.repositories import CareerProfileRepository
+from apps.backend.app.shared.contracts import ResumeParseResult
 
 from .models import (
     Bullet,
@@ -145,7 +146,7 @@ class CareerVaultStore:
                 profile.source_resumes.append(resume)
                 profile.updated_at = utc_now()
                 self._persist_profile(profile, self._upload_key(filename, text))
-            return ResumeUploadResult(
+            result = ResumeUploadResult(
                 candidate_profile_id=profile.candidate_profile_id,
                 parse_status="parsed",
                 source_filename=filename,
@@ -153,6 +154,8 @@ class CareerVaultStore:
                 created_profile=profile,
                 duplicate_of=profile.candidate_profile_id,
             )
+            ResumeParseResult.model_validate(result.model_dump(mode="json"))
+            return result
         name = self._extract_name(text)
         email = self._extract_email(text)
         phone = self._extract_phone(text)
@@ -177,13 +180,15 @@ class CareerVaultStore:
             for claim in self._extract_claims(text)
         ]
         self._persist_profile(profile, self._upload_key(filename, text))
-        return ResumeUploadResult(
+        result = ResumeUploadResult(
             candidate_profile_id=profile.candidate_profile_id,
             parse_status="parsed",
             source_filename=filename,
             extracted_text=text.strip(),
             created_profile=profile,
         )
+        ResumeParseResult.model_validate(result.model_dump(mode="json"))
+        return result
 
     def create_or_update_profile_from_bytes(self, content: bytes, filename: str) -> ResumeUploadResult:
         suffix = Path(filename).suffix.lower()
