@@ -36,5 +36,11 @@ jobs:
           script: |
             set -e
             cd /opt/projects/jobcopilot
-            docker compose down || true
-            docker compose up -d --build
+            docker compose down --remove-orphans || true
+            docker compose up -d --build --remove-orphans
+            docker compose ps
+            docker compose logs --tail 50 backend
+            docker compose logs --tail 50 worker
+            docker compose logs --tail 50 postgres
+            curl -fsS http://127.0.0.1:8000/health
+            curl -fsS http://127.0.0.1:8000/health/database
