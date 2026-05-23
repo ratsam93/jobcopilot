@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ApiError, api, clearToken, getToken, setToken } from './api'
+import { ApiError, api, clearToken, getToken, isDemoMode, setDemoMode, setToken } from './api'
 
 type ActivityEvent = {
   timestamp: string
@@ -280,6 +280,7 @@ export default function App() {
       setTokenState(response.access_token)
       sessionStorage.setItem(STORAGE.email, response.user.email)
       setEmail(response.user.email)
+      setDemoMode(Boolean(response.demo_mode))
       await loadSnapshot()
     } catch {
       // handled by apiCall
@@ -290,6 +291,7 @@ export default function App() {
 
   const handleLogout = () => {
     clearSession()
+    setDemoMode(false)
     setResumeState(null)
     setCampaignState(null)
     setRunState(null)
@@ -469,7 +471,7 @@ export default function App() {
       <section className="topbar">
         <div className="status-pill">Backend: {backendStatus}</div>
         <div className="status-pill">Database: {databaseStatus}</div>
-        <div className="status-pill">Auth: {loggedIn ? 'signed_in' : 'signed_out'}</div>
+        <div className="status-pill">Auth: {loggedIn ? 'signed_in' : 'signed_out'}{isDemoMode() ? ' / demo' : ''}</div>
         <div className="status-pill">User: {loggedIn ? email : 'not signed in'}</div>
         <div className="status-pill">Profile: {currentProfileId || 'none'}</div>
         <div className="status-pill">Campaign: {currentCampaignId || 'none'}</div>
@@ -541,6 +543,7 @@ export default function App() {
               <button onClick={handleUploadResumeFile} disabled={!resumeFile}>Upload Resume File</button>
               <button onClick={handleSavePastedResume}>Save Pasted Resume</button>
             </div>
+            <div className="meta">{isDemoMode() ? 'Demo mode: using local fallback data until the backend is available.' : 'Live mode: requests go to the backend.'}</div>
             {resumeState && (
               <div className="summary-strip">
                 <span>upload_status: {resumeState.parsed ? 'success' : 'pending'}</span>
