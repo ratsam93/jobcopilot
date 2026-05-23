@@ -6,5 +6,4 @@ psycopg[binary]==3.2.4
 alembic==1.14.1
 celery==5.5.3
 redis==5.3.0
-PyJWT==2.10.1
 python-multipart==0.0.20
