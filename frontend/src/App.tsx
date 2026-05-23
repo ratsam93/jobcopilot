@@ -192,6 +192,7 @@ export default function App() {
 
   const clearSession = () => {
     clearToken()
+    setDemoMode(false)
     sessionStorage.removeItem(STORAGE.email)
     sessionStorage.removeItem(STORAGE.profileId)
     sessionStorage.removeItem(STORAGE.campaignId)
@@ -295,7 +296,9 @@ export default function App() {
   }
 
   useEffect(() => {
-    void loadSnapshot()
+    if (loggedIn) {
+      void loadSnapshot()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -328,9 +331,32 @@ export default function App() {
     }
   }
 
+  const handleDemoLogin = async () => {
+    setDemoMode(true)
+    const demoEmail = email || 'admin@jobcopilot.local'
+    const response = await api.login(demoEmail, password)
+    setToken(response.access_token)
+    setTokenState(response.access_token)
+    sessionStorage.setItem(STORAGE.email, response.user.email)
+    setEmail(response.user.email)
+    setBackendStatus('demo')
+    setDatabaseStatus('demo')
+    setLastError('')
+    addActivity(
+      eventMessage({
+        action: 'demo_login',
+        endpoint: 'local-demo-session',
+        status: 'ok',
+        entity_id: response.user.id,
+        message: `Demo mode started for ${response.user.email}`,
+        response,
+      }),
+    )
+    await loadSnapshot()
+  }
+
   const handleLogout = () => {
     clearSession()
-    setDemoMode(false)
     setResumeState(null)
     setCampaignState(null)
     setRunState(null)
@@ -348,7 +374,12 @@ export default function App() {
   }
 
   const handleUploadResumeFile = async () => {
-    if (!resumeFile) return
+    if (!resumeFile) {
+      const message = 'Choose a PDF, DOCX, or TXT file before clicking Process Document.'
+      setLastError(message)
+      addActivity(eventMessage({ action: 'upload_resume', endpoint: '/api/career-vault/resume/upload', status: 'blocked', entity_id: '', message }))
+      return
+    }
     const response = await apiCall('upload_resume', '/api/career-vault/resume/upload', () => api.uploadResumeFile(resumeFile), { filename: resumeFile.name, content_type: resumeFile.type, file_size: resumeFile.size }, 'resume')
     const parsed = response.parsed_resume
     setResumeState({
@@ -765,6 +796,12 @@ export default function App() {
                 <button onClick={handleLogin} disabled={loginBusy} style={{ width: '100%', marginTop: '8px' }}>
                   {loginBusy ? 'Authenticating...' : 'Sign In'}
                 </button>
+                <button className="secondary" onClick={handleDemoLogin} disabled={loginBusy} style={{ width: '100%' }}>
+                  Use Demo Mode
+                </button>
+                <p className="meta" style={{ margin: 0 }}>
+                  If the backend is unavailable, demo mode keeps the workflow console usable without pretending data was sent to production.
+                </p>
               </div>
             </div>
           )}
@@ -903,6 +940,11 @@ export default function App() {
                             Process Document
                           </button>
                         </div>
+                        {!resumeFile && (
+                          <p className="meta" style={{ margin: '12px 0 0 0' }}>
+                            Browse for a file first, or use Save Pasted Text below.
+                          </p>
+                        )}
                       </div>
 
                       <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px' }}>

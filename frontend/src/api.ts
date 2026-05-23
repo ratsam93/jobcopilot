@@ -124,7 +124,7 @@ async function fallback<T>(task: Promise<T>, mockValue: T): Promise<T> {
   try {
     return await task
   } catch (error) {
-    if (error instanceof ApiError) {
+    if (error instanceof ApiError && error.status === 401) {
       throw error
     }
     return mockValue
