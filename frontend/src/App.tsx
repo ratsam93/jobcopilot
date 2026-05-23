@@ -375,6 +375,12 @@ export default function App() {
   }
 
   const handleUploadResumeFile = async () => {
+    if (isDemoMode()) {
+      const message = 'Real resume upload is disabled in Demo Mode. Log out, sign in with the live backend, then upload again.'
+      setLastError(message)
+      addActivity(eventMessage({ action: 'upload_resume', endpoint: '/api/career-vault/resume/upload', status: 'blocked', entity_id: '', message }))
+      return
+    }
     if (!resumeFile) {
       const message = 'Choose a PDF, DOCX, or TXT file before clicking Process Document.'
       setLastError(message)
@@ -399,6 +405,12 @@ export default function App() {
   }
 
   const handleSavePastedResume = async () => {
+    if (isDemoMode()) {
+      const message = 'Real resume parsing is disabled in Demo Mode. Log out, sign in with the live backend, then save pasted text again.'
+      setLastError(message)
+      addActivity(eventMessage({ action: 'save_pasted_resume', endpoint: '/api/career-vault/resume/upload', status: 'blocked', entity_id: '', message }))
+      return
+    }
     const response = await apiCall(
       'save_pasted_resume',
       '/api/career-vault/resume/upload',
@@ -913,6 +925,16 @@ export default function App() {
                       <h2>Resume Intake Center</h2>
                     </div>
                     <p className="card-description">Upload your existing document or paste raw text to feed the Career Vault kernel.</p>
+                    {isDemoMode() && (
+                      <div className="claims-alert-box" style={{ marginBottom: '16px', background: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.35)' }}>
+                        <div className="claims-title" style={{ color: 'var(--warning)' }}>
+                          Demo Mode Active
+                        </div>
+                        <p className="meta" style={{ margin: 0 }}>
+                          This screen is showing sample data only. Log out and sign in with the live backend before uploading a real resume.
+                        </p>
+                      </div>
+                    )}
                     
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       <div style={{ border: '2px dashed var(--border-medium)', borderRadius: '12px', padding: '24px', textAlign: 'center', background: 'rgba(255,255,255,0.01)' }}>
@@ -937,7 +959,7 @@ export default function App() {
                           <button className="secondary" onClick={() => document.getElementById('file-upload-input')?.click()}>
                             Browse Files
                           </button>
-                          <button onClick={handleUploadResumeFile} disabled={!resumeFile}>
+                          <button onClick={handleUploadResumeFile} disabled={!resumeFile || isDemoMode()}>
                             {isDemoMode() ? 'Process Demo Document' : 'Upload and Parse Document'}
                           </button>
                         </div>
@@ -964,7 +986,7 @@ export default function App() {
                             placeholder="Paste text contents here..."
                           />
                         </label>
-                        <button onClick={handleSavePastedResume} style={{ marginTop: '8px' }}>
+                        <button onClick={handleSavePastedResume} disabled={isDemoMode()} style={{ marginTop: '8px' }}>
                           Save Pasted Text
                         </button>
                       </div>

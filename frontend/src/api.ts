@@ -147,21 +147,13 @@ export const api = {
           user: { id: mockId('user'), email: username || 'admin@jobcopilot.local', created_at: mockNow() },
           demo_mode: true,
         })
-      : fallback(
-          request<AuthToken>('/auth/login', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({ username, password }).toString(),
-          }),
-          {
-            access_token: mockId('demo-token'),
-            token_type: 'bearer',
-            user: { id: mockId('user'), email: username || 'admin@jobcopilot.local', created_at: mockNow() },
-            demo_mode: true,
+      : request<AuthToken>('/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
           },
-        ),
+          body: new URLSearchParams({ username, password }).toString(),
+        }),
   health: () => (isDemoMode() ? demo({ status: 'demo' }) : fallback(request<{ status: string }>('/health'), { status: 'demo' })),
   databaseHealth: () =>
     isDemoMode()
