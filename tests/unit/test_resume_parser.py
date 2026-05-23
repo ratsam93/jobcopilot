@@ -8,6 +8,7 @@ from fastapi import HTTPException
 import pytest
 
 from apps.backend.app.modules.career_vault.service import store
+from apps.backend.app.modules.career_vault import service as career_vault_service
 
 
 def test_resume_parser_builds_profile_from_text_fixture() -> None:
@@ -36,6 +37,21 @@ def test_resume_parser_extracts_text_from_docx_bytes() -> None:
     assert result.created_profile.full_name == "Alex Rivera"
     assert result.created_profile.primary_email == "alex@example.com"
     assert "Python" in [skill.skill_name for skill in result.created_profile.skills]
+
+
+def test_resume_parser_uses_docling_for_docx_before_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_docling_extract(content: bytes, filename: str) -> str:
+        assert filename == "docling_resume.docx"
+        assert content == b"not-a-real-docx"
+        return "Priya Shah\npriya@example.com\nRemote USA\n- Built Python FastAPI SQL workflows"
+
+    monkeypatch.setattr(career_vault_service, "extract_document_text", fake_docling_extract)
+
+    result = store.create_or_update_profile_from_bytes(b"not-a-real-docx", filename="docling_resume.docx")
+
+    assert result.parse_status == "parsed"
+    assert result.created_profile.full_name == "Priya Shah"
+    assert result.created_profile.primary_email == "priya@example.com"
 
 
 def test_resume_parser_extracts_text_from_pdf_bytes() -> None:

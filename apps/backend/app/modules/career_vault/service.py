@@ -12,6 +12,7 @@ from pypdf import PdfReader
 from apps.backend.app.repositories import CareerProfileRepository
 from apps.backend.app.shared.contracts import ResumeParseResult
 
+from .docling_adapter import extract_document_text
 from .models import (
     Bullet,
     BulletInput,
@@ -211,6 +212,15 @@ class CareerVaultStore:
 
     def _extract_text_from_bytes(self, content: bytes, filename: str) -> str:
         suffix = Path(filename).suffix.lower()
+        if suffix in {".pdf", ".docx"}:
+            try:
+                text = extract_document_text(content, filename)
+                if text.strip():
+                    return text
+            except Exception:
+                # Fall back to lightweight extractors below so a Docling edge case
+                # does not block uploads that simple parsers can still read.
+                pass
         if suffix == ".pdf":
             try:
                 reader = PdfReader(BytesIO(content))
