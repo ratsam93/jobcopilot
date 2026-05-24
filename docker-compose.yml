@@ -119,5 +119,16 @@ services:
       - "3001:3000"
     restart: unless-stopped
 
+  cv-matcher:
+    profiles:
+      - oss-cv-matcher
+    container_name: jobcopilot-cv-matcher
+    build:
+      context: ./oss-services/cv-matcher
+      dockerfile: build.dockerfile
+    ports:
+      - "3002:8501"
+    restart: unless-stopped
+
 volumes:
   postgres_data:
