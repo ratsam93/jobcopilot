@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ApiError, api, clearToken, getToken, setToken } from './api'
+import { ApiError, api, clearToken, getToken, setToken, type OSSIntegrationRegistry } from './api'
 
 type ActivityEvent = {
   timestamp: string
@@ -84,7 +84,7 @@ function eventMessage(a: Partial<ActivityEvent> & Pick<ActivityEvent, 'action' |
 
 export default function App() {
   // Navigation & UI States
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vault' | 'campaign' | 'radar' | 'approval' | 'logs'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vault' | 'campaign' | 'radar' | 'approval' | 'oss' | 'logs'>('dashboard')
   const [isDevConsoleExpanded, setIsDevConsoleExpanded] = useState(false)
   const [selectedArtifactTab, setSelectedArtifactTab] = useState<'resume' | 'cover' | 'email' | 'script'>('resume')
 
@@ -115,6 +115,7 @@ export default function App() {
   const [artifacts, setArtifacts] = useState<Array<Record<string, unknown>>>([])
   const [reviewQueue, setReviewQueue] = useState<Array<Record<string, unknown>>>([])
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null)
+  const [ossRegistry, setOssRegistry] = useState<OSSIntegrationRegistry | null>(null)
 
   // Debugging & Activity log states
   const [activity, setActivity] = useState<ActivityEvent[]>([])
@@ -198,6 +199,17 @@ export default function App() {
     setDatabaseStatus(db.status)
   }
 
+  const refreshOssIntegrations = async () => {
+    const registry = await apiCall(
+      'load_oss_integrations',
+      '/api/oss/integrations',
+      () => api.ossIntegrations(),
+      { include_status: true },
+      'oss',
+    )
+    setOssRegistry(registry)
+  }
+
   const refreshWorkflow = async (campaignId: string) => {
     if (!campaignId) return
     const [state, jobsResponse, artifactsResponse, reviewResponse, activityResponse] = await Promise.all([
@@ -251,6 +263,7 @@ export default function App() {
 
   const loadSnapshot = async () => {
     await refreshHealth()
+    await refreshOssIntegrations()
     if (currentProfileId) {
       try {
         const parsed = await api.profileParsed(currentProfileId)
@@ -291,6 +304,9 @@ export default function App() {
       setBackendStatus('unavailable')
       setDatabaseStatus('unavailable')
       setLastError(error instanceof Error ? error.message : String(error))
+    })
+    void refreshOssIntegrations().catch(() => {
+      // The debug drawer already records API failures.
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -691,6 +707,20 @@ export default function App() {
             </svg>
             <span>Outreach & Sync</span>
           </button>
+
+          <button
+            className={`nav-item ${activeTab === 'oss' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('oss')
+              void refreshOssIntegrations()
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
+            <span>OSS Integrations</span>
+          </button>
         </nav>
         
         <div className="sidebar-footer">
@@ -723,6 +753,7 @@ export default function App() {
             {activeTab === 'campaign' && 'Campaign Control Room'}
             {activeTab === 'radar' && 'Job Search Radar'}
             {activeTab === 'approval' && 'Human Approval Gates'}
+            {activeTab === 'oss' && 'OSS Integration Control'}
             {activeTab === 'logs' && 'Transmission Log & History'}
           </h1>
           
@@ -1617,6 +1648,96 @@ export default function App() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              )}
+
+              {activeTab === 'oss' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="card-premium">
+                    <div className="card-title-row">
+                      <h2>Direct OSS Tooling Status</h2>
+                      <button className="secondary" onClick={() => void refreshOssIntegrations()}>
+                        Refresh
+                      </button>
+                    </div>
+                    <p className="card-description">
+                      This is the production source of truth for the upstream repositories: which are directly wired, which are optional services, and which are blocked for safety or license reasons.
+                    </p>
+                    <div className="metrics-grid">
+                      <div className="metric-card">
+                        <span className="metric-label">Active OSS paths</span>
+                        <span className="metric-value">{ossRegistry?.active_count ?? 0}</span>
+                      </div>
+                      <div className="metric-card">
+                        <span className="metric-label">Blocked by license/safety</span>
+                        <span className="metric-value">{ossRegistry?.blocked_count ?? 0}</span>
+                      </div>
+                      <div className="metric-card">
+                        <span className="metric-label">Total tracked repos</span>
+                        <span className="metric-value">{ossRegistry?.integrations.length ?? 0}</span>
+                      </div>
+                      <div className="metric-card">
+                        <span className="metric-label">Production mode</span>
+                        <span className="metric-value">Live</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="card-premium">
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="table-premium">
+                        <thead>
+                          <tr>
+                            <th>Tool</th>
+                            <th>Status</th>
+                            <th>Classification</th>
+                            <th>Direct usage</th>
+                            <th>License</th>
+                            <th>Next action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(ossRegistry?.integrations ?? []).map((item) => (
+                            <tr key={item.key}>
+                              <td>
+                                <strong style={{ color: '#fff' }}>{item.name}</strong>
+                                <div className="meta">{item.repo_url}</div>
+                              </td>
+                              <td>
+                                <span className={`badge ${item.enabled ? 'success' : item.classification.includes('blocked') ? 'danger' : 'warning'}`}>
+                                  {item.enabled ? 'enabled' : item.classification.includes('blocked') ? 'blocked' : 'pending'}
+                                </span>
+                              </td>
+                              <td>{item.classification}</td>
+                              <td style={{ minWidth: '260px' }}>{item.direct_usage}</td>
+                              <td>{item.license}</td>
+                              <td style={{ minWidth: '220px' }}>{item.next_action ?? 'No action required.'}</td>
+                            </tr>
+                          ))}
+                          {!ossRegistry && (
+                            <tr>
+                              <td colSpan={6} className="meta" style={{ textAlign: 'center', padding: '32px' }}>
+                                OSS integration status has not loaded yet.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {ossRegistry && (
+                    <div className="card-premium">
+                      <div className="card-title-row">
+                        <h2>Safety and Deployment Notes</h2>
+                      </div>
+                      <ul style={{ marginTop: 0, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+                        {ossRegistry.notes.map((note) => (
+                          <li key={note}>{note}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
 

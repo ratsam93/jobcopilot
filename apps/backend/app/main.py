@@ -14,6 +14,7 @@ from apps.backend.app.modules.auth.api import router as auth_router
 from apps.backend.app.modules.campaign_planner.api import router as campaign_router
 from apps.backend.app.modules.career_vault.api import router as career_vault_router
 from apps.backend.app.modules.outreach_generator.api import router as outreach_router
+from apps.backend.app.modules.oss_integrations.api import router as oss_router
 
 
 @asynccontextmanager
@@ -38,6 +39,7 @@ app.include_router(career_vault_router, prefix="/api")
 app.include_router(campaign_router, prefix="/api")
 app.include_router(outreach_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
+app.include_router(oss_router, prefix="/api")
 
 
 @app.exception_handler(HTTPException)

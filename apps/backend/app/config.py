@@ -13,6 +13,23 @@ class Settings(BaseModel):
     gmail_oauth_redirect_uri: str | None = None
     jobber_base_url: str = "https://jobber.mihir.ch"
     jobber_sources: str = "ashby:linear,lever:netlify,greenhouse:airbnb"
+    browser_automation_enabled: bool = False
+    crawlee_enabled: bool = False
+    cv_matcher_enabled: bool = False
+    reactive_resume_enabled: bool = False
+    langgraph_enabled: bool = False
+    pydantic_ai_enabled: bool = False
+    langfuse_host: str | None = None
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    openresume_enabled: bool = False
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def load_settings() -> Settings:
@@ -27,6 +44,16 @@ def load_settings() -> Settings:
         gmail_oauth_redirect_uri=os.getenv("JOBCOPILOT_GMAIL_OAUTH_REDIRECT_URI"),
         jobber_base_url=os.getenv("JOBCOPILOT_JOBBER_BASE_URL", "https://jobber.mihir.ch"),
         jobber_sources=os.getenv("JOBCOPILOT_JOBBER_SOURCES", "ashby:linear,lever:netlify,greenhouse:airbnb"),
+        browser_automation_enabled=_env_bool("JOBCOPILOT_BROWSER_AUTOMATION_ENABLED"),
+        crawlee_enabled=_env_bool("JOBCOPILOT_CRAWLEE_ENABLED"),
+        cv_matcher_enabled=_env_bool("JOBCOPILOT_CV_MATCHER_ENABLED"),
+        reactive_resume_enabled=_env_bool("JOBCOPILOT_REACTIVE_RESUME_ENABLED"),
+        langgraph_enabled=_env_bool("JOBCOPILOT_LANGGRAPH_ENABLED"),
+        pydantic_ai_enabled=_env_bool("JOBCOPILOT_PYDANTIC_AI_ENABLED"),
+        langfuse_host=os.getenv("JOBCOPILOT_LANGFUSE_HOST"),
+        langfuse_public_key=os.getenv("JOBCOPILOT_LANGFUSE_PUBLIC_KEY"),
+        langfuse_secret_key=os.getenv("JOBCOPILOT_LANGFUSE_SECRET_KEY"),
+        openresume_enabled=_env_bool("JOBCOPILOT_OPENRESUME_ENABLED"),
     )
 
 

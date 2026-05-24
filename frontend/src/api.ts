@@ -55,6 +55,28 @@ export type AuthToken = {
   user: { id: string; email: string; created_at: string }
 }
 
+export type OSSIntegrationStatus = {
+  key: string
+  name: string
+  repo_url: string
+  license: string
+  classification: string
+  enabled: boolean
+  production_status: string
+  direct_usage: string
+  local_clone_present: boolean
+  config_keys: string[]
+  safety_notes: string[]
+  next_action?: string | null
+}
+
+export type OSSIntegrationRegistry = {
+  integrations: OSSIntegrationStatus[]
+  active_count: number
+  blocked_count: number
+  notes: string[]
+}
+
 const baseUrl = '/api'
 const tokenKey = 'jobcopilot.token'
 
@@ -161,6 +183,7 @@ export const api = {
   campaignArtifacts: (campaignId: string) => request<Array<Record<string, unknown>>>(`/campaigns/${campaignId}/artifacts`),
   campaignReviewQueue: (campaignId: string) => request<Array<Record<string, unknown>>>(`/campaigns/${campaignId}/review-queue`),
   campaignActivity: (campaignId: string) => request<Array<Record<string, unknown>>>(`/campaigns/${campaignId}/activity`),
+  ossIntegrations: () => request<OSSIntegrationRegistry>('/oss/integrations'),
   manualJob: (campaignId: string, payload: Record<string, unknown>) =>
     request<Record<string, unknown>>(`/campaigns/${campaignId}/manual-job`, {
       method: 'POST',
