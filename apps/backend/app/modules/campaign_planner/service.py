@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from fastapi import HTTPException
 
@@ -127,9 +127,21 @@ class CampaignPlannerStore:
         campaign.runs.append(run)
         campaign.status = "running"
         campaign.updated_at = utc_now()
+        discovered = JobDiscoveryService.with_default_oss_adapters().discover_and_persist()
         campaign.jobs = [
-            JobSummary(job_id=uuid4(), campaign_id=campaign_id, title="Queued job 1", company_name="Example AI", status="queued"),
-            JobSummary(job_id=uuid4(), campaign_id=campaign_id, title="Queued job 2", company_name="Northstar Labs", status="queued"),
+            JobSummary(
+                job_id=uuid5(NAMESPACE_URL, record.normalized_job.job_id),
+                campaign_id=campaign_id,
+                title=record.normalized_job.title,
+                company_name=record.normalized_job.company,
+                source=record.normalized_job.source,
+                source_url=record.normalized_job.source_url,
+                location=record.normalized_job.location,
+                remote=record.normalized_job.remote,
+                status="discovered",
+                reason="Imported from jobber OSS ATS adapter.",
+            )
+            for record in discovered
         ]
         self._persist(campaign)
         return run
@@ -221,6 +233,9 @@ class CampaignPlannerStore:
             "current_step": self._current_step(run_payload),
             "steps": steps,
             "jobs": jobs,
+            "jobs_discovered": len(jobs),
+            "zero_jobs_reason": None if jobs else "No jobs discovered from configured jobber OSS ATS sources",
+            "next_action": None if jobs else "Set JOBCOPILOT_JOBBER_SOURCES or add a manual job description",
             "artifacts": packages,
             "review_items": review_items,
             "activity": activity[-20:],

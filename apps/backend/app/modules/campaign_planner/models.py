@@ -82,6 +82,12 @@ class JobSummary(BaseModel):
     campaign_id: UUID
     title: str
     company_name: str
+    source: str | None = None
+    source_url: str | None = None
+    location: str | None = None
+    remote: bool = False
+    fit_score: float | None = None
+    reason: str | None = None
     status: str = "queued"
 
 

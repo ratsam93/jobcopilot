@@ -56,7 +56,15 @@ def discover_jobs(campaign_id: str, workflow_run_id: str | None = None) -> dict[
     workflow_runs.mark_started(run_id, {"campaign_id": campaign_id, "task": "discover_jobs", "current_step": "job_discovery"})
     try:
         campaign = campaign_store.start_run(UUID(campaign_id))
-        result = {"campaign_id": campaign_id, "job_count": len(campaign_store.list_jobs(UUID(campaign_id)))}
+        jobs = campaign_store.list_jobs(UUID(campaign_id))
+        result = {
+            "campaign_id": campaign_id,
+            "job_count": len(jobs),
+            "jobs_discovered": len(jobs),
+            "source": "jobber_oss_adapter",
+            "zero_jobs_reason": None if jobs else "No jobs discovered from configured jobber OSS ATS sources",
+            "next_action": None if jobs else "Set JOBCOPILOT_JOBBER_SOURCES or add a manual job description",
+        }
         workflow_runs.mark_succeeded(run_id, result)
         return result
     except Exception as exc:  # noqa: BLE001

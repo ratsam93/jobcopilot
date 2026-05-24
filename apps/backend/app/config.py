@@ -11,6 +11,8 @@ class Settings(BaseModel):
     gmail_oauth_client_id: str | None = None
     gmail_oauth_client_secret: str | None = None
     gmail_oauth_redirect_uri: str | None = None
+    jobber_base_url: str = "https://jobber.mihir.ch"
+    jobber_sources: str = "ashby:linear,lever:netlify,greenhouse:airbnb"
 
 
 def load_settings() -> Settings:
@@ -23,6 +25,8 @@ def load_settings() -> Settings:
         gmail_oauth_client_id=os.getenv("JOBCOPILOT_GMAIL_OAUTH_CLIENT_ID"),
         gmail_oauth_client_secret=os.getenv("JOBCOPILOT_GMAIL_OAUTH_CLIENT_SECRET"),
         gmail_oauth_redirect_uri=os.getenv("JOBCOPILOT_GMAIL_OAUTH_REDIRECT_URI"),
+        jobber_base_url=os.getenv("JOBCOPILOT_JOBBER_BASE_URL", "https://jobber.mihir.ch"),
+        jobber_sources=os.getenv("JOBCOPILOT_JOBBER_SOURCES", "ashby:linear,lever:netlify,greenhouse:airbnb"),
     )
 
 

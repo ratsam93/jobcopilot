@@ -103,6 +103,12 @@ class JobDiscoveryService:
         normalized = self.normalize_and_dedup(self.discover())
         return self.store.persist(normalized)
 
+    @classmethod
+    def with_default_oss_adapters(cls, store: JobDiscoveryStore | None = None) -> "JobDiscoveryService":
+        from .jobber_adapter import JobberATSAdapter
+
+        return cls(adapters=[JobberATSAdapter()], store=store)
+
     @staticmethod
     def normalize(job: Job) -> NormalizedJob:
         canonical_url = _canonicalize_url(job.source_url)
