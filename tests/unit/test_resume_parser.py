@@ -64,6 +64,34 @@ def test_resume_upload_key_is_database_safe_for_real_resume_length() -> None:
     assert long_resume.lower() not in upload_key
 
 
+def test_resume_parser_preserves_name_based_email_address() -> None:
+    text = "Samrat Rao\nsamrat.rao+jobs@gmail.com\n- Built Python FastAPI SQL workflows"
+
+    result = store.parse_resume_text(text, filename="samrat_email_resume_v2.txt")
+
+    assert result.created_profile.primary_email == "samrat.rao+jobs@gmail.com"
+
+
+def test_resume_parser_trims_docling_concatenated_email_artifact() -> None:
+    text = "Samrat Rao\nsamrat.rao@gmail.comLinkedIn\n- Built Python FastAPI SQL workflows"
+
+    result = store.parse_resume_text(text, filename="samrat_concat_email_resume_v2.txt")
+
+    assert result.created_profile.primary_email == "samrat.rao@gmail.com"
+
+
+def test_duplicate_resume_refreshes_email_with_current_parser() -> None:
+    text = "Ravi Kumar\nravi.kumar@gmail.com\n- Built Python FastAPI SQL workflows"
+    first = store.parse_resume_text(text, filename="duplicate_email_refresh.txt")
+    first.created_profile.primary_email = "kumar@gmail.com"
+    store._persist_profile(first.created_profile, store._upload_key("duplicate_email_refresh.txt", text))
+
+    second = store.parse_resume_text(text, filename="duplicate_email_refresh.txt")
+
+    assert second.duplicate_of == first.candidate_profile_id
+    assert second.created_profile.primary_email == "ravi.kumar@gmail.com"
+
+
 def test_resume_parser_extracts_text_from_pdf_bytes() -> None:
     pdf = b"""%PDF-1.4
 1 0 obj

@@ -47,6 +47,25 @@ SKILL_KEYWORDS = [
     "llm",
     "machine learning",
 ]
+COMMON_EMAIL_TLDS = (
+    "com",
+    "net",
+    "org",
+    "edu",
+    "gov",
+    "io",
+    "ai",
+    "co",
+    "in",
+    "us",
+    "uk",
+    "ca",
+    "au",
+    "de",
+    "fr",
+    "me",
+    "dev",
+)
 
 
 class CareerVaultStore:
@@ -144,6 +163,11 @@ class CareerVaultStore:
         existing = self._detect_duplicate(filename, text)
         if existing:
             profile = self.get_profile(existing)
+            profile.full_name = self._extract_name(text) or profile.full_name
+            profile.primary_email = self._extract_email(text) or profile.primary_email
+            profile.phone = self._extract_phone(text) or profile.phone
+            profile.location = self._extract_location(text) or profile.location
+            profile.career_story = self._infer_story(text) or profile.career_story
             resume = ResumeSource(filename=filename, text=text.strip())
             if not any(
                 source.filename.lower() == filename.lower()
@@ -151,8 +175,8 @@ class CareerVaultStore:
                 for source in profile.source_resumes
             ):
                 profile.source_resumes.append(resume)
-                profile.updated_at = utc_now()
-                self._persist_profile(profile, self._upload_key(filename, text))
+            profile.updated_at = utc_now()
+            self._persist_profile(profile, self._upload_key(filename, text))
             result = ResumeUploadResult(
                 candidate_profile_id=profile.candidate_profile_id,
                 parse_status="parsed",
@@ -246,17 +270,22 @@ class CareerVaultStore:
         return content.decode("utf-8-sig", errors="ignore")
 
     def _extract_email(self, text: str) -> str | None:
-        matches = re.findall(r"[\w.\-+]+@[\w.\-]+\.\w+", text)
+        matches = re.findall(r"(?<![\w.+-])[\w.+-]+@(?:[\w-]+\.)+[A-Za-z]{2,64}", text)
         if not matches:
             return None
-        email = matches[0]
+        email = matches[0].strip(".-_+")
         local, domain = email.split("@", 1)
-        compact_name = re.sub(r"[^a-z]", "", self._extract_name(text) or "", flags=re.IGNORECASE).lower()
-        if compact_name and local.lower().startswith(compact_name):
-            local = local[len(compact_name) :]
-        elif len(local) > 32:
-            local = re.split(r"(?<=[a-z])(?=[A-Z])", local)[-1]
-        return f"{local}@{domain}" if local else email
+        domain_parts = domain.split(".")
+        if domain_parts:
+            final_part = domain_parts[-1]
+            lowered_final_part = final_part.lower()
+            if lowered_final_part not in COMMON_EMAIL_TLDS:
+                for tld in sorted(COMMON_EMAIL_TLDS, key=len, reverse=True):
+                    if lowered_final_part.startswith(tld) and len(final_part) > len(tld):
+                        domain_parts[-1] = final_part[: len(tld)]
+                        domain = ".".join(domain_parts)
+                        break
+        return f"{local}@{domain}".lower()
 
     def _extract_phone(self, text: str) -> str | None:
         match = re.search(r"(\+?\d[\d\s().-]{7,}\d)", text)
