@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
 from uuid import UUID
@@ -71,7 +72,9 @@ class CareerVaultStore:
         self._persist_profile(profile, self._upload_key(filename, text))
 
     def _upload_key(self, filename: str, text: str) -> str:
-        return f"{filename.lower()}::{re.sub(r'\\s+', ' ', text.strip()).lower()}"
+        normalized_text = re.sub(r"\s+", " ", text.strip()).lower()
+        digest = sha256(f"{filename.lower()}::{normalized_text}".encode("utf-8")).hexdigest()
+        return f"{filename.lower()}::{digest}"[:512]
 
     def get_profile(self, candidate_profile_id: UUID) -> CareerProfile:
         profile = self.repo.get(candidate_profile_id)

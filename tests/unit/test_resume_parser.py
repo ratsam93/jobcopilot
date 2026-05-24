@@ -54,6 +54,16 @@ def test_resume_parser_uses_docling_for_docx_before_fallback(monkeypatch: pytest
     assert result.created_profile.primary_email == "priya@example.com"
 
 
+def test_resume_upload_key_is_database_safe_for_real_resume_length() -> None:
+    long_resume = "Sam Patel\n" + "Python FastAPI SQL Postgres Docker AWS LLMs " * 200
+
+    upload_key = store._upload_key("Samrat.docx", long_resume)
+
+    assert upload_key.startswith("samrat.docx::")
+    assert len(upload_key) <= 512
+    assert long_resume.lower() not in upload_key
+
+
 def test_resume_parser_extracts_text_from_pdf_bytes() -> None:
     pdf = b"""%PDF-1.4
 1 0 obj
