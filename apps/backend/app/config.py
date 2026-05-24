@@ -23,6 +23,7 @@ class Settings(BaseModel):
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None
     openresume_enabled: bool = False
+    openresume_url: str = "http://open-resume:3000"
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -54,6 +55,7 @@ def load_settings() -> Settings:
         langfuse_public_key=os.getenv("JOBCOPILOT_LANGFUSE_PUBLIC_KEY"),
         langfuse_secret_key=os.getenv("JOBCOPILOT_LANGFUSE_SECRET_KEY"),
         openresume_enabled=_env_bool("JOBCOPILOT_OPENRESUME_ENABLED"),
+        openresume_url=os.getenv("JOBCOPILOT_OPENRESUME_URL", "http://open-resume:3000"),
     )
 
 

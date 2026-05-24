@@ -114,15 +114,21 @@ def list_oss_integrations(active_settings: Settings = settings) -> OSSIntegratio
             key="open-resume",
             name="OpenResume",
             repo_url="https://github.com/xitanggg/open-resume",
-            license="AGPL-3.0",
-            classification="blocked_license",
+            license="AGPL-3.0 with user-confirmed owner permission",
+            classification="approved_optional_service" if openresume_enabled else "license_approved_disabled",
             enabled=openresume_enabled,
-            production_status="blocked_unless_agpl_approved",
-            direct_usage="Not copied into the product because AGPL obligations need explicit approval.",
+            production_status="vendored_as_separate_service" if openresume_enabled else "approved_but_disabled",
+            direct_usage=(
+                "OpenResume is vendored under oss-services/open-resume and can run as a separate Next service "
+                f"at {active_settings.openresume_url}."
+            ),
             local_clone_present=Path("research/oss-reference/agpl/open-resume").exists(),
-            config_keys=["JOBCOPILOT_OPENRESUME_ENABLED"],
-            safety_notes=["AGPL code must stay isolated until licensing is accepted for the product."],
-            next_action="Get explicit AGPL acceptance before copying or serving OpenResume code.",
+            config_keys=["JOBCOPILOT_OPENRESUME_ENABLED", "JOBCOPILOT_OPENRESUME_URL"],
+            safety_notes=[
+                "License owner permission was confirmed by the project owner before product use.",
+                "The app remains a separated service instead of being mixed into FastAPI internals.",
+            ],
+            next_action=None if openresume_enabled else "Set JOBCOPILOT_OPENRESUME_ENABLED=true to show it as active.",
         ),
         OSSIntegrationStatus(
             key="browser-use",

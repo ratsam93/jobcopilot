@@ -46,7 +46,8 @@ def test_oss_registry_marks_safe_active_and_blocked_integrations() -> None:
     assert integrations["jobber"].enabled is True
     assert integrations["docling"].classification == "active_dependency"
     assert integrations["docling"].enabled is True
-    assert integrations["open-resume"].classification == "blocked_license"
+    assert integrations["open-resume"].classification == "approved_optional_service"
     assert integrations["open-resume"].enabled is True
+    assert "owner permission" in integrations["open-resume"].license
     assert integrations["langfuse"].enabled is True
     assert "LinkedIn scraping" in " ".join(integrations["browser-use"].safety_notes)
