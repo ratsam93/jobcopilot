@@ -287,6 +287,15 @@ export default function App() {
   }
 
   useEffect(() => {
+    void refreshHealth().catch((error) => {
+      setBackendStatus('unavailable')
+      setDatabaseStatus('unavailable')
+      setLastError(error instanceof Error ? error.message : String(error))
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
     if (loggedIn) {
       void loadSnapshot()
     }
