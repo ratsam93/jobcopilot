@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import os
-from typing import Any
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
-from crawlee import Request
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -66,14 +64,14 @@ async def crawl(payload: CrawlRequest) -> CrawlResponse:
                 links.append(href)
         pages.append(
             CrawlPage(
-                url=context.request.loaded_url or context.request.url,
+                url=context.request.url,
                 title=soup.title.string.strip() if soup.title and soup.title.string else None,
                 text_preview=text[:1000],
                 links=links,
             )
         )
 
-    await crawler.run([Request.from_url(url) for url in urls])
+    await crawler.run(urls)
 
     return CrawlResponse(
         status="success",
