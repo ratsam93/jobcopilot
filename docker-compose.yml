@@ -130,5 +130,103 @@ services:
       - "3002:8501"
     restart: unless-stopped
 
+  reactive-resume-postgres:
+    profiles:
+      - oss-reactive-resume
+    image: postgres:16-alpine
+    container_name: jobcopilot-reactive-resume-postgres
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - reactive_resume_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  reactive-resume-redis:
+    profiles:
+      - oss-reactive-resume
+    image: redis:7-alpine
+    container_name: jobcopilot-reactive-resume-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - reactive_resume_redis_data:/data
+    restart: unless-stopped
+
+  reactive-resume-storage:
+    profiles:
+      - oss-reactive-resume
+    image: chrislusf/seaweedfs:latest
+    container_name: jobcopilot-reactive-resume-storage
+    command: server -s3 -filer -dir=/data -ip=0.0.0.0
+    environment:
+      AWS_ACCESS_KEY_ID: seaweedfs
+      AWS_SECRET_ACCESS_KEY: seaweedfs
+    volumes:
+      - reactive_resume_storage_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  reactive-resume-create-bucket:
+    profiles:
+      - oss-reactive-resume
+    image: quay.io/minio/mc:latest
+    container_name: jobcopilot-reactive-resume-create-bucket
+    entrypoint: >
+      /bin/sh -c "
+        sleep 5;
+        mc alias set seaweedfs http://reactive-resume-storage:8333 seaweedfs seaweedfs;
+        mc mb --ignore-existing seaweedfs/reactive-resume;
+        exit 0;
+      "
+    depends_on:
+      reactive-resume-storage:
+        condition: service_healthy
+    restart: "no"
+
+  reactive-resume:
+    profiles:
+      - oss-reactive-resume
+    image: ghcr.io/amruthpillai/reactive-resume:latest
+    container_name: jobcopilot-reactive-resume
+    environment:
+      PORT: 3000
+      APP_URL: http://158.220.113.185:3003
+      DATABASE_URL: postgresql://postgres:postgres@reactive-resume-postgres:5432/postgres
+      AUTH_SECRET: ${REACTIVE_RESUME_AUTH_SECRET:-change-me-before-public-use}
+      REDIS_URL: redis://reactive-resume-redis:6379
+      ENCRYPTION_SECRET: ${REACTIVE_RESUME_ENCRYPTION_SECRET:-change-me-before-public-use}
+      S3_ACCESS_KEY_ID: seaweedfs
+      S3_SECRET_ACCESS_KEY: seaweedfs
+      S3_REGION: us-east-1
+      S3_ENDPOINT: http://reactive-resume-storage:8333
+      S3_BUCKET: reactive-resume
+      S3_FORCE_PATH_STYLE: "true"
+      FLAG_DISABLE_IMAGE_PROCESSING: "true"
+    ports:
+      - "3003:3000"
+    depends_on:
+      reactive-resume-postgres:
+        condition: service_healthy
+      reactive-resume-redis:
+        condition: service_started
+      reactive-resume-storage:
+        condition: service_healthy
+      reactive-resume-create-bucket:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  reactive_resume_postgres_data:
+  reactive_resume_redis_data:
+  reactive_resume_storage_data:
