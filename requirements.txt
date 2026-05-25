@@ -10,3 +10,4 @@ python-multipart==0.0.20
 pypdf==5.3.0
 python-docx==1.1.2
 docling-slim[format-docx,format-pdf-pypdfium2,format-latex]==2.94.0
+langgraph==1.0.3
