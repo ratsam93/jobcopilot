@@ -143,6 +143,19 @@ services:
       - "3005:8000"
     restart: unless-stopped
 
+  browser-use:
+    profiles:
+      - oss-browser-use
+    container_name: jobcopilot-browser-use
+    build:
+      context: ./oss-services/browser-use
+      dockerfile: Dockerfile
+    environment:
+      BROWSER_USE_ALLOWED_HOSTS: ${JOBCOPILOT_BROWSER_USE_ALLOWED_HOSTS:-example.com,www.ycombinator.com}
+    ports:
+      - "3006:8000"
+    restart: unless-stopped
+
   reactive-resume-postgres:
     profiles:
       - oss-reactive-resume
