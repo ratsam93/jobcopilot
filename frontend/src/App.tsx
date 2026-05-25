@@ -64,6 +64,13 @@ const workflowSteps = [
 const defaultPrompt =
   'Apply to top technology companies across the USA where I am fit. Prepare resume, cover letter, find hiring manager and recruiter, but do not send anything without my approval.'
 
+const devLoginDefaults = import.meta.env.DEV
+  ? {
+      email: import.meta.env.VITE_JOBCOPILOT_DEV_EMAIL ?? '',
+      password: import.meta.env.VITE_JOBCOPILOT_DEV_PASSWORD ?? '',
+    }
+  : { email: '', password: '' }
+
 function now() {
   return new Date().toISOString()
 }
@@ -90,8 +97,8 @@ export default function App() {
 
   // Authentication states
   const [token, setTokenState] = useState(getToken() ?? '')
-  const [email, setEmail] = useState(sessionStorage.getItem(STORAGE.email) ?? 'admin@jobcopilot.local')
-  const [password, setPassword] = useState('admin123')
+  const [email, setEmail] = useState(sessionStorage.getItem(STORAGE.email) ?? devLoginDefaults.email)
+  const [password, setPassword] = useState(devLoginDefaults.password)
   const [backendStatus, setBackendStatus] = useState('loading')
   const [databaseStatus, setDatabaseStatus] = useState('loading')
 
