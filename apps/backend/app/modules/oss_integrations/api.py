@@ -25,4 +25,4 @@ async def post_langgraph_probe() -> LangGraphProbeResult:
 
 @router.post("/pydantic-ai/probe", response_model=PydanticAIProbeResult)
 async def post_pydantic_ai_probe() -> PydanticAIProbeResult:
-    return run_pydantic_ai_probe()
+    return await run_pydantic_ai_probe()

@@ -22,7 +22,7 @@ class PydanticAIProbeResult(BaseModel):
     output: PydanticAIProbeOutput
 
 
-def run_pydantic_ai_probe() -> PydanticAIProbeResult:
+async def run_pydantic_ai_probe() -> PydanticAIProbeResult:
     try:
         from pydantic_ai import Agent
         from pydantic_ai.models.test import TestModel
@@ -40,7 +40,7 @@ def run_pydantic_ai_probe() -> PydanticAIProbeResult:
             "The output must include a summary, at least one signal, and whether approval is required."
         ),
     )
-    result = agent.run_sync("Probe PydanticAI structured output for JobCopilot.")
+    result = await agent.run("Probe PydanticAI structured output for JobCopilot.")
     output = result.output
 
     return PydanticAIProbeResult(
