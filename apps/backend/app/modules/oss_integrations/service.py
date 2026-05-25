@@ -106,7 +106,11 @@ def list_oss_integrations(active_settings: Settings = settings) -> OSSIntegratio
             production_status="available_as_optional_profile",
             direct_usage="Reactive Resume can run as an isolated optional Docker profile on host port 3003 using its own Postgres, Redis, and object storage.",
             local_clone_present=_clone_exists("Reactive-Resume"),
-            config_keys=["JOBCOPILOT_REACTIVE_RESUME_ENABLED"],
+            config_keys=[
+                "JOBCOPILOT_REACTIVE_RESUME_ENABLED",
+                "JOBCOPILOT_REACTIVE_RESUME_AUTH_SECRET",
+                "JOBCOPILOT_REACTIVE_RESUME_ENCRYPTION_SECRET",
+            ],
             safety_notes=["Large full-stack app; keep isolated until explicitly promoted."],
             next_action="Start with: docker compose --profile oss-reactive-resume up -d reactive-resume",
         ),
