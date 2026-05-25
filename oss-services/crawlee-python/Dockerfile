@@ -3,7 +3,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir fastapi==0.115.8 uvicorn[standard]==0.34.0 crawlee==1.7.0 beautifulsoup4==4.12.3
+    && pip install --no-cache-dir fastapi==0.115.8 uvicorn[standard]==0.34.0 crawlee==1.7.0 beautifulsoup4==4.12.3 httpx==0.28.1
 
 COPY app.py /app/app.py
 
