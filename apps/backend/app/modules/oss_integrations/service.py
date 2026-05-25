@@ -197,12 +197,21 @@ def list_oss_integrations(active_settings: Settings = settings) -> OSSIntegratio
             license="MIT",
             classification="optional_observability_service",
             enabled=langfuse_enabled,
-            production_status="configured" if langfuse_enabled else "not_configured",
-            direct_usage="No traces are emitted unless Langfuse host and keys are configured.",
+            production_status="configured" if langfuse_enabled else "available_as_optional_profile",
+            direct_usage="Langfuse can run as an isolated optional Docker profile on host port 3004; traces are emitted only after host and API keys are configured.",
             local_clone_present=_clone_exists("langfuse"),
-            config_keys=["JOBCOPILOT_LANGFUSE_HOST", "JOBCOPILOT_LANGFUSE_PUBLIC_KEY", "JOBCOPILOT_LANGFUSE_SECRET_KEY"],
-            safety_notes=["Secrets are never returned by the status endpoint."],
-            next_action=None if langfuse_enabled else "Configure Langfuse host and keys or run Langfuse as a separate observability stack.",
+            config_keys=[
+                "JOBCOPILOT_LANGFUSE_HOST",
+                "JOBCOPILOT_LANGFUSE_PUBLIC_KEY",
+                "JOBCOPILOT_LANGFUSE_SECRET_KEY",
+                "JOBCOPILOT_LANGFUSE_INIT_USER_EMAIL",
+                "JOBCOPILOT_LANGFUSE_INIT_USER_PASSWORD",
+            ],
+            safety_notes=[
+                "Secrets are never returned by the status endpoint.",
+                "The full Langfuse stack is heavier than the other OSS services; start it only when testing observability.",
+            ],
+            next_action=None if langfuse_enabled else "Start with: docker compose --profile oss-langfuse up -d langfuse-web",
         ),
     ]
 
