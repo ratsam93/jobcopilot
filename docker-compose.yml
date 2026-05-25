@@ -130,6 +130,19 @@ services:
       - "3002:8501"
     restart: unless-stopped
 
+  crawlee:
+    profiles:
+      - oss-crawlee
+    container_name: jobcopilot-crawlee
+    build:
+      context: ./oss-services/crawlee-python
+      dockerfile: Dockerfile
+    environment:
+      CRAWLEE_MAX_PAGES: ${JOBCOPILOT_CRAWLEE_MAX_PAGES:-3}
+    ports:
+      - "3005:8000"
+    restart: unless-stopped
+
   reactive-resume-postgres:
     profiles:
       - oss-reactive-resume
